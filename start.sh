@@ -181,6 +181,21 @@ install_command() {
 }
 install_command || echo "Couldn't install the neurochat command; ./start.sh still works." >&2
 
+# Port 8765 taken? Usually it's the NeuroChat Docker container (it restarts itself), or another
+# neurochat window. Say which, instead of failing to start.
+if ! python -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 8765))' 2>/dev/null; then
+  box=""
+  if command -v docker >/dev/null; then box="$(docker ps --filter publish=8765 --format '{{.Names}}' 2>/dev/null | head -1 || true)"; fi
+  if [ -n "$box" ]; then
+    echo "The NeuroChat Docker container ($box) is already running on http://127.0.0.1:8765." >&2
+    echo "Use that, or stop it first to run NeuroChat here:  docker stop $box" >&2
+  else
+    echo "Something is already using port 8765, probably NeuroChat in another window." >&2
+    echo "Open http://127.0.0.1:8765, or close the other one first." >&2
+  fi
+  exit 1
+fi
+
 # Open WebUI: the full chat portal, where tutor conversations carry on ("Continue in Open WebUI").
 # It runs in Docker when Docker is running, otherwise in its own Python environment in .webui.
 # Sign-in is off: it only listens on this computer and is for one person.

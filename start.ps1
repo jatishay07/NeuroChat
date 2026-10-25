@@ -140,6 +140,21 @@ try {
   }
 } catch { Write-Warning "Couldn't install the neurochat command; start.cmd still works." }
 
+# Port 8765 taken? Usually it's the NeuroChat Docker container (it restarts itself), or another
+# neurochat window. Say which, instead of failing to start.
+$portFree = $true
+try { $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 8765); $l.Start(); $l.Stop() } catch { $portFree = $false }
+if (-not $portFree) {
+  $box = $null
+  if (Get-Command docker -ErrorAction SilentlyContinue) { $box = docker ps --filter publish=8765 --format "{{.Names}}" 2>$null | Select-Object -First 1 }
+  if ($box) {
+    Write-Warning "The NeuroChat Docker container ($box) is already running on http://127.0.0.1:8765. Use that, or stop it first to run NeuroChat here:  docker stop $box"
+  } else {
+    Write-Warning "Something is already using port 8765, probably NeuroChat in another window. Open http://127.0.0.1:8765, or close the other one first."
+  }
+  exit 1
+}
+
 # Open WebUI: the full chat portal, where tutor conversations carry on ("Continue in Open WebUI").
 # It runs in Docker when Docker is running, otherwise in its own Python environment in .webui.
 # Sign-in is off: it only listens on this computer and is for one person. Fewer background
