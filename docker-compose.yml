@@ -36,11 +36,6 @@ services:
     environment:
       WEBUI_AUTH: "False"
       ENABLE_OPENAI_API: "False"
-      DEFAULT_MODELS: neurochat-tutor   # the companion creates this model (Qwen plus the tutor's instructions)
-      # Fewer background requests (follow-up suggestions, tags, autocomplete) keep a small model responsive.
-      ENABLE_FOLLOW_UP_GENERATION: "False"
-      ENABLE_TAGS_GENERATION: "False"
-      ENABLE_AUTOCOMPLETE_GENERATION: "False"
       OLLAMA_BASE_URL: ${OLLAMA_HOST:-http://host.docker.internal:11434}
     restart: unless-stopped
 
