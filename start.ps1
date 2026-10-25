@@ -69,29 +69,45 @@ if (-not (Test-Path $Stamp) -or (Get-Item pyproject.toml).LastWriteTime -gt (Get
 }
 
 # Local model: install Ollama if it's missing, make sure it's running, download the model once.
+function Install-Ollama {
+  Write-Host "Installing the latest Ollama (runs the local model)..."
+  Get-Process "ollama app", "ollama" -ErrorAction SilentlyContinue | Stop-Process -Force
+  $setup = Join-Path $env:TEMP "OllamaSetup.exe"
+  Invoke-WebRequest https://ollama.com/download/OllamaSetup.exe -OutFile $setup
+  Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+  Remove-Item $setup -ErrorAction SilentlyContinue
+  if (-not (Test-Path (Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"))) { throw "Ollama didn't install. Get it from https://ollama.com/download" }
+}
+function Start-Ollama($ollama) {
+  & $ollama list *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Start-Process $ollama -ArgumentList "serve" -WindowStyle Hidden
+    for ($i = 0; $i -lt 40; $i++) { Start-Sleep -Milliseconds 500; & $ollama list *> $null; if ($LASTEXITCODE -eq 0) { break } }
+  }
+}
+function Test-Model($ollama) {
+  $have = & $ollama list 2>$null | Select-Object -Skip 1 | ForEach-Object { ($_ -split "\s+")[0] }
+  return $have -contains $Model
+}
 function Setup-Model {
   $ollama = (Get-Command ollama -ErrorAction SilentlyContinue).Source
   $default = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
   if (-not $ollama -and (Test-Path $default)) { $ollama = $default }
-  if (-not $ollama) {
-    Write-Host "Installing Ollama (runs the local model)..."
-    $setup = Join-Path $env:TEMP "OllamaSetup.exe"
-    Invoke-WebRequest https://ollama.com/download/OllamaSetup.exe -OutFile $setup
-    Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-    Remove-Item $setup -ErrorAction SilentlyContinue
-    if (-not (Test-Path $default)) { throw "Ollama didn't install. Get it from https://ollama.com/download" }
-    $ollama = $default
-  }
-  & $ollama list *> $null
-  if ($LASTEXITCODE -ne 0) {
-    Start-Process $ollama -ArgumentList "serve" -WindowStyle Hidden
-    for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Milliseconds 500; & $ollama list *> $null; if ($LASTEXITCODE -eq 0) { break } }
-  }
-  $have = & $ollama list 2>$null | Select-Object -Skip 1 | ForEach-Object { ($_ -split "\s+")[0] }
-  if ($have -notcontains $Model) {
+  if (-not $ollama) { Install-Ollama; $ollama = $default }
+  Start-Ollama $ollama
+  if (-not (Test-Model $ollama)) {
     Write-Host "Downloading $Model (one time only)..."
-    & $ollama pull $Model
+    $ErrorActionPreference = "Continue"  # ollama writes progress to stderr; don't treat it as a failure
+    & $ollama pull $Model 2>&1 | Tee-Object -Variable pullLog | Out-Host
+    if (($pullLog | Out-String) -match "newer version of Ollama") {
+      # The model needs a newer Ollama than the one installed: update it and try once more.
+      Install-Ollama
+      Start-Ollama $default
+      $ollama = $default
+      & $ollama pull $Model
+    }
   }
+  if (-not (Test-Model $ollama)) { throw "Couldn't download $Model. If it says Ollama is too old, update it from https://ollama.com/download." }
   Write-Host "Local model ready: $Model"
 }
 if (-not $SkipModel) {
