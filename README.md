@@ -68,11 +68,10 @@ python -m companion --simulate     # or: python -m companion
 </details>
 
 Click **Find my headset**, and connect. No headset with you? Click **Skip to eye tracking**: it
-calibrates [WebGazer](https://webgazer.cs.brown.edu) on your webcam (video never leaves the browser)
+calibrates [WebEyeTrack](https://github.com/RedForestAI/WebEyeTrack) on your webcam (video never leaves the browser)
 and shows how long you spend on each paragraph of a test passage. When a paragraph takes you much
 longer than the rest, the tutor offers to explain it with the local model (streamed over
-`/ws/chat`), and you can ask follow-up questions. WebGazer is GPL-3.0 and is
-loaded from a CDN at runtime, not bundled here.
+`/ws/chat`), and you can ask follow-up questions.
 
 With a real headset, close the Muse app first (the headset talks to one app at a time).
 The companion scans over Bluetooth LE with [bleak](https://github.com/hbldh/bleak), starts

@@ -120,4 +120,3 @@ button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 .accuracy { color: var(--muted); margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 -10px; }
 @media (max-width: 900px) { .reader { grid-template-columns: 1fr; } .panel { position: static; } .text { padding: 24px; } }
-body.reading #webgazerVideoContainer { top: auto !important; left: auto !important; right: 16px !important; bottom: 16px !important; transform: scale(.55); transform-origin: bottom right; border-radius: 16px; overflow: hidden; }

@@ -7,6 +7,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="tutor.css">
+  <link rel="stylesheet" href="gaze.css">
 </head>
 <body class="eyes">
   <header class="top">
@@ -29,7 +30,7 @@
 
   <!-- 2. Calibration dots fill the screen -->
   <div id="calib" class="calib" hidden>
-    <p class="calib-help" id="calibHelp">Look at each dot and click it 5 times. It turns green when it's done.</p>
+    <p class="calib-help" id="calibHelp">Look right at the dot, then click it.</p>
     <div id="dots"></div>
   </div>
 
@@ -74,8 +75,15 @@
     </aside>
   </div>
 
-  <!-- WebGazer (GPL-3.0) is loaded from a CDN at runtime rather than bundled into this repo. -->
-  <script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
+  <!-- Camera preview (the tracker reads frames from this video) and the gaze dot. -->
+  <div id="cam" class="cam" hidden>
+    <video id="camVideo" autoplay playsinline muted></video>
+    <span id="faceChip" class="chip">Starting…</span>
+  </div>
+  <div id="gazeDot" class="gaze-dot" hidden></div>
+
+  <!-- WebEyeTrack (MIT), built from github.com/RedForestAI/WebEyeTrack; see vendor/webeyetrack/README.md. -->
+  <script src="vendor/webeyetrack/webeyetrack.js"></script>
   <script src="eyes.js"></script>
   <script src="tutor.js"></script>
 </body>

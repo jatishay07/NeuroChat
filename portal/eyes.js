@@ -1,77 +1,102 @@
-// Eye tracking: calibrate WebGazer with 9 click targets, measure accuracy, then track which
-// paragraph of a reading passage the gaze lands on and for how long.
+// Eye tracking with WebEyeTrack (MIT, github.com/RedForestAI/WebEyeTrack): calibrate on 9 points,
+// measure accuracy, then track which paragraph of a reading passage the gaze lands on and for how long.
 const $ = (id) => document.getElementById(id);
-const WEBGAZER_ASSETS = "https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/mediapipe/face_mesh";
-const CLICKS_PER_DOT = 5;
+const CALIB_POINTS = [[50, 50], [6, 8], [50, 8], [94, 8], [94, 50], [94, 92], [50, 92], [6, 92], [6, 50]];
+const NEXT_DOT_MS = 1200; // WebEyeTrack ignores clicks less than 1 s apart, so pace the dots
 const ACCURACY_SECONDS = 4;
 const MAX_GAP_MS = 250; // a longer gap between gaze samples (tab hidden, face lost) isn't reading time
 const SLOW_FACTOR = 1.5; // this many times the median time per word = "slow here"
 
 let showDot = true, showCam = true;
 let tracking = false;
-let last = null; // {x, y, t}
+let last = null; // {i, t}
 let dwell = []; // ms per paragraph
 let paras = [];
+let webcam = null;
+let face = false; // is a face with open eyes in view right now?
+let latest = null; // latest gaze point {x, y, t}
+let onReady = null;
 
 function say(text, isError = false) {
   $("message").textContent = text || "";
   $("message").classList.toggle("error", isError);
 }
 
+function setFace(found, open) {
+  face = found && open;
+  const chip = $("faceChip");
+  chip.textContent = !found ? "Can't see your face" : open ? "Tracking your eyes" : "Eyes closed";
+  chip.className = `chip ${face ? "ok" : "bad"}`;
+}
+
+function onResult(r) {
+  const found = r.facialLandmarks && r.facialLandmarks.length > 0;
+  setFace(found, r.gazeState === "open");
+  if (onReady) { onReady(); onReady = null; }
+  if (!face) { $("gazeDot").hidden = true; return; }
+  // normPog is the gaze point on the screen, from -0.5 to 0.5 on each axis, centre = (0, 0).
+  const x = (r.normPog[0] + 0.5) * innerWidth, y = (r.normPog[1] + 0.5) * innerHeight;
+  latest = { x, y, t: performance.now() };
+  const dot = $("gazeDot");
+  dot.hidden = !showDot;
+  dot.style.transform = `translate(${x}px, ${y}px)`;
+  onGaze(latest, latest.t);
+}
+
 async function start() {
-  if (typeof webgazer === "undefined") {
-    say("Couldn't load the eye tracker. Check your internet connection and reload.", true);
+  if (typeof WebEyeTrackProxy === "undefined") {
+    say("Couldn't load the eye tracker. Reload the page.", true);
     return;
   }
   $("startBtn").disabled = true;
-  say("Starting the camera… allow access when your browser asks.");
+  say("Starting the camera… allow access when your browser asks. The first time, the eye tracker downloads about 5 MB.");
   try {
-    webgazer.params.faceMeshSolutionPath = WEBGAZER_ASSETS;
-    webgazer.params.saveDataAcrossSessions = false;
-    await webgazer.setRegression("ridge").setGazeListener(onGaze).begin();
-    webgazer.showVideoPreview(true).showFaceOverlay(true).showFaceFeedbackBox(true).showPredictionPoints(true);
-    webgazer.applyKalmanFilter(true);
+    const s = await navigator.mediaDevices.getUserMedia({ video: true });
+    s.getTracks().forEach((t) => t.stop()); // just asking for permission; WebEyeTrack opens its own stream
   } catch (e) {
     $("startBtn").disabled = false;
     say(`The camera didn't start: ${e.message || e}. Allow camera access for this page and try again.`, true);
     return;
   }
-  calibrate();
+  $("cam").hidden = false;
+  webcam = new WebcamClient("camVideo");
+  const proxy = new WebEyeTrackProxy(webcam); // also learns from every click on the page from now on
+  proxy.onGazeResults = onResult;
+  const timeout = setTimeout(() => say("Still loading the eye tracker… check your internet connection.", true), 30000);
+  onReady = () => { clearTimeout(timeout); say(""); calibrate(); };
 }
 
 function calibrate() {
   tracking = false;
   document.body.classList.remove("reading");
-  webgazer.clearData();
+  document.body.classList.add("calibrating");
   $("intro").hidden = true;
   $("reader").hidden = true;
   $("calib").hidden = false;
-  $("calibHelp").textContent = `Look at each dot and click it ${CLICKS_PER_DOT} times. It turns green when it's done.`;
   const dots = $("dots");
   dots.innerHTML = "";
-  let done = 0;
-  for (const y of [8, 50, 92]) {
-    for (const x of [6, 50, 94]) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "dot-target";
-      b.style.left = `${x}%`;
-      b.style.top = `${y}%`;
-      b.setAttribute("aria-label", "Calibration point");
-      let clicks = 0;
-      b.onclick = () => {
-        // WebGazer learns from every click on the page: looking here, cursor here.
-        clicks++;
-        b.style.setProperty("--fill", clicks / CLICKS_PER_DOT);
-        if (clicks === CLICKS_PER_DOT) {
-          b.classList.add("done");
-          b.disabled = true;
-          if (++done === 9) measureAccuracy();
-        }
-      };
-      dots.append(b);
-    }
-  }
+  let n = 0;
+  const next = () => {
+    if (n === CALIB_POINTS.length) return measureAccuracy();
+    const [x, y] = CALIB_POINTS[n++];
+    $("calibHelp").textContent = `Look right at the dot, then click it (${n} of ${CALIB_POINTS.length}).`;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "dot-target";
+    b.style.left = `${x}%`;
+    b.style.top = `${y}%`;
+    b.setAttribute("aria-label", `Calibration point ${n}`);
+    b.onclick = () => {
+      // The click itself is what WebEyeTrack learns from: "the eyes looked here, right now".
+      if (!face) { $("calibHelp").textContent = "I can't see your eyes. Check the camera preview, then click the dot again."; return; }
+      b.disabled = true;
+      b.classList.add("done");
+      b.style.setProperty("--fill", 1);
+      setTimeout(() => { b.remove(); next(); }, NEXT_DOT_MS);
+    };
+    dots.append(b);
+  };
+  next();
 }
 
 function measureAccuracy() {
@@ -83,9 +108,8 @@ function measureAccuracy() {
   c.style.top = "50%";
   $("dots").append(c);
   const samples = [];
-  const timer = setInterval(async () => {
-    const p = await webgazer.getCurrentPrediction();
-    if (p) samples.push(p);
+  const timer = setInterval(() => {
+    if (face && latest && performance.now() - latest.t < 200) samples.push(latest);
   }, 100);
   setTimeout(() => {
     clearInterval(timer);
@@ -94,13 +118,14 @@ function measureAccuracy() {
     const errs = samples.map((p) => Math.hypot(p.x - cx, p.y - cy));
     const mean = errs.length ? errs.reduce((a, b) => a + b, 0) / errs.length : null;
     $("accuracy").textContent = mean == null
-      ? "No gaze samples during the check: is your face in the camera box?"
-      : `Calibration: about ${Math.round(mean)} px off on average (${Math.max(0, Math.round(100 * (1 - mean / half)))}% accuracy). Under ~150 px is good enough to tell paragraphs apart.`;
+      ? "No gaze samples during the check: is your face in the camera preview?"
+      : `Calibration: about ${Math.round(mean)} px off on average (${Math.max(0, Math.round(100 * (1 - mean / half)))}% accuracy). Under ~150 px is good enough to tell paragraphs apart. Clicking anywhere while looking at the spot you click keeps improving it.`;
     read();
   }, ACCURACY_SECONDS * 1000);
 }
 
 function read() {
+  document.body.classList.remove("calibrating");
   $("calib").hidden = true;
   $("reader").hidden = false;
   document.body.classList.add("reading"); // tucks the camera preview into a corner
@@ -176,12 +201,12 @@ $("resetBtn").onclick = reset;
 $("recalBtn").onclick = calibrate;
 $("dotBtn").onclick = () => {
   showDot = !showDot;
-  webgazer.showPredictionPoints(showDot);
+  $("gazeDot").hidden = !showDot;
   $("dotBtn").textContent = showDot ? "Hide gaze dot" : "Show gaze dot";
 };
 $("camBtn").onclick = () => {
   showCam = !showCam;
-  webgazer.showVideoPreview(showCam).showFaceOverlay(showCam).showFaceFeedbackBox(showCam);
+  $("cam").classList.toggle("collapsed", !showCam);
   $("camBtn").textContent = showCam ? "Hide camera" : "Show camera";
 };
-window.addEventListener("beforeunload", () => typeof webgazer !== "undefined" && webgazer.end());
+window.addEventListener("beforeunload", () => webcam && webcam.stopWebcam());
