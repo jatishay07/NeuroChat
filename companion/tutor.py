@@ -26,6 +26,11 @@ Explain that paragraph again in plain language:
 End by asking in one short sentence whether that made sense or which part is still unclear.
 For follow-up questions, answer briefly and concretely."""
 
+# For chats that don't start from a paragraph (the chat page, and Open WebUI's NeuroChat Tutor).
+CHAT_PROMPT = """You are a patient tutor. The person is reading something and wants help understanding it.
+Explain in plain language: the main idea first, then the details, defining any jargon you keep.
+Use an everyday analogy when it helps, keep answers short, and ask what is still unclear."""
+
 
 class TutorError(Exception):
     """Ollama isn't reachable or the model isn't available; the message is shown to the user."""
@@ -55,11 +60,11 @@ class Tutor:
                     "error": f"The model {self.model} isn't downloaded yet. Run neurochat again to download it."}
         return {"model": self.model, "ready": True, "error": None}
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: list[dict], system: str = SYSTEM_PROMPT) -> AsyncIterator[str]:
         """Send the conversation and yield the reply as it arrives."""
         body = {
             "model": self.model,
-            "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+            "messages": [{"role": "system", "content": system}, *messages],
             "stream": True,
             "think": False,  # Qwen3.5 can "think" first; for a tutor reply that's just a long wait
             "options": {"temperature": 0.4},
