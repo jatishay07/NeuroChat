@@ -60,3 +60,20 @@
   .card, .text, .panel, .reader .offer, .reader .tutor, .dock { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (max-width: 640px) { .reader .text h1 { font-size: 30px; } .reader .text p:not(.eyebrow) { font-size: 17px; } .dock { gap: 6px; padding-left: 12px; } }
+
+/* Recap when you finish reading. */
+.recap { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(243, 245, 249, .55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.recap[hidden] { display: none; }
+.recap .card { margin: 0; max-width: 520px; text-align: left; gap: 24px; padding: 36px; }
+.recap-head { display: grid; gap: 6px; }
+.recap-bars { list-style: none; margin: 0; padding: 0; height: 110px; display: flex; align-items: stretch; gap: 8px; }
+.recap-bars li { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
+.recap-bars .bar { width: 100%; border-radius: 10px; background: rgba(11, 13, 18, .85); }
+.recap-bars .n { font-size: 11px; color: var(--muted); }
+.recap-bars li.slow .bar { background: var(--warn); }
+.recap-bars li.slow .n { color: #8a5200; font-weight: 600; }
+.recap-note { display: flex; align-items: center; gap: 12px; padding: 14px 10px 14px 18px; border-radius: 22px; background: rgba(255, 255, 255, .6); font-size: 14px; line-height: 1.45; }
+.recap-note[hidden] { display: none; }
+.recap-note i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.recap-note div { flex: 1; }
+.recap-note button { flex: none; }

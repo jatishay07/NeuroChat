@@ -69,4 +69,51 @@
   }
   headset();
   setInterval(headset, 5000);
+
+  // Recap: when you finish, how long each paragraph took and which one slowed you down.
+  // Read from the bars eyes.js keeps up to date, so the numbers match Insights.
+  let startedAt = null;
+  new MutationObserver(() => {
+    if (document.body.classList.contains("reading") && startedAt === null) startedAt = Date.now();
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+  function recap() {
+    const rows = [...$("bars").children].map((li, i) => ({
+      i,
+      width: parseFloat(li.querySelector(".fill")?.style.width) || 0,
+      slow: li.classList.contains("slow"),
+    }));
+    const mins = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 60000)) : null;
+    $("recapSub").textContent = document.querySelector("#text h1")?.textContent.trim() || "";
+    $("recapTitle").textContent = mins ? `You read it in ${mins} minute${mins === 1 ? "" : "s"}` : "Your reading";
+    $("recapBars").replaceChildren(...rows.map((r) => {
+      const li = document.createElement("li");
+      li.className = r.slow ? "slow" : "";
+      li.innerHTML = `<span class="bar"></span><span class="n"></span>`;
+      li.querySelector(".bar").style.height = `${Math.max(6, r.width)}%`;
+      li.querySelector(".n").textContent = r.i + 1;
+      li.setAttribute("aria-label", `Paragraph ${r.i + 1}${r.slow ? ", slow" : ""}`);
+      return li;
+    }));
+    const worst = rows.filter((r) => r.slow).sort((a, b) => b.width - a.width)[0];
+    $("recapNote").hidden = !worst;
+    if (worst) {
+      $("recapNote").dataset.i = worst.i;
+      $("recapNoteTitle").textContent = `Paragraph ${worst.i + 1} slowed you down.`;
+      $("recapNoteText").textContent = "Want it explained another way?";
+    }
+    toggleInsights(false);
+    $("recap").hidden = false;
+    $("recapClose").focus();
+  }
+  const closeRecap = () => { $("recap").hidden = true; };
+  $("finishBtn").onclick = recap;
+  $("recapClose").onclick = closeRecap;
+  $("recap").onclick = (e) => e.target === $("recap") && closeRecap();
+  document.addEventListener("keydown", (e) => e.key === "Escape" && closeRecap());
+  $("recapExplain").onclick = () => {
+    const i = Number($("recapNote").dataset.i);
+    closeRecap();
+    window.dispatchEvent(new CustomEvent("paragraph:explain", { detail: { index: i, text: paras()[i].textContent.trim() } }));
+  };
 })();

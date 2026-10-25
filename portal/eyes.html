@@ -89,7 +89,24 @@
       <span class="sep" aria-hidden="true"></span>
       <button id="insightsBtn" type="button" class="quiet" aria-expanded="false" aria-controls="insights">Insights</button>
       <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
+      <button id="finishBtn" type="button" class="quiet">Finish</button>
     </nav>
+
+    <div id="recap" class="recap" role="dialog" aria-modal="true" aria-labelledby="recapTitle" hidden>
+      <section class="card">
+        <div class="recap-head">
+          <span class="muted small" id="recapSub"></span>
+          <h1 id="recapTitle"></h1>
+        </div>
+        <ol id="recapBars" class="recap-bars" aria-label="Time on each paragraph"></ol>
+        <div id="recapNote" class="recap-note" hidden>
+          <i aria-hidden="true"></i>
+          <div><strong id="recapNoteTitle"></strong> <span id="recapNoteText" class="muted"></span></div>
+          <button id="recapExplain" type="button" class="quiet">Explain it</button>
+        </div>
+        <button id="recapClose" type="button" class="primary">Keep reading</button>
+      </section>
+    </div>
   </div>
 
   <!-- Camera preview (the tracker reads frames from this video) and the gaze dot. -->
