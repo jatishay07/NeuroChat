@@ -7,6 +7,8 @@ const TIPS = {
 };
 
 let status = null;
+let bt = null; // the Web Bluetooth session, when the browser connected the headset itself
+const webBluetooth = !!window.MuseBluetooth?.supported();
 
 async function call(path, body) {
   const res = await fetch(path, {
@@ -33,7 +35,10 @@ function render(s) {
   $("find").hidden = live;
   $("live").hidden = !live;
   $("scanBtn").disabled = busy;
-  $("scanBtn").textContent = s.state === "scanning" ? "Looking…" : s.devices.length ? "Look again" : "Find my headset";
+  $("scanBtn").textContent = s.state === "scanning" ? "Looking…" : s.devices.length && !webBluetooth ? "Look again" : "Find my headset";
+  // Web Bluetooth is the main way in; the companion's own scan stays for other browsers.
+  $("simLink").hidden = !s.simulated || busy;
+  $("nativeLink").hidden = !webBluetooth || s.simulated || busy;
 
   const list = $("devices");
   list.innerHTML = "";
@@ -75,6 +80,27 @@ function render(s) {
   else if (s.state === "idle" && !s.devices.length) say("");
 }
 
+async function findHeadset() {
+  if (webBluetooth) return connectBluetooth();
+  if (status?.simulated) {
+    return say("This browser can't use Bluetooth. Open this page in Chrome or Edge to connect your headset.", true);
+  }
+  scan();
+}
+
+async function connectBluetooth() {
+  say("Pick your Muse in the list your browser shows.");
+  bt?.stop();
+  bt = new MuseBluetooth((message) => { bt = null; if (message) say(message, true); });
+  try {
+    await bt.connect();
+  } catch (e) {
+    bt = null;
+    // Closing the browser's list isn't an error.
+    say(/cancel/i.test(e.message) ? "" : e.message || String(e), !/cancel/i.test(e.message));
+  }
+}
+
 async function scan() {
   say("Looking for headsets nearby…");
   try { render(await call("/api/device/scan")); } catch (e) { say(e.message, true); }
@@ -86,6 +112,8 @@ async function connect(address) {
 }
 
 async function disconnect() {
+  bt?.stop();
+  bt = null;
   try { render(await call("/api/device/disconnect")); } catch (e) { say(e.message, true); }
 }
 
@@ -95,7 +123,9 @@ function listen() {
   ws.onclose = () => { say("Lost contact with the companion app. Retrying…", true); setTimeout(listen, 2000); };
 }
 
-$("scanBtn").onclick = scan;
+$("scanBtn").onclick = findHeadset;
+$("simBtn").onclick = (e) => { e.preventDefault(); scan(); };
+$("nativeBtn").onclick = (e) => { e.preventDefault(); scan(); };
 $("disconnectBtn").onclick = disconnect;
 $("continueBtn").onclick = () => { location.href = "/eyes.html"; };
 listen();

@@ -53,6 +53,7 @@ class SimulatedBackend:
 
     channels = EEG_CHANNELS
     srate = EEG_SRATE
+    simulated = True
 
     def __init__(self, bad_channel: str | None = None, seed: int = 7):
         self.bad_channel = bad_channel
@@ -99,6 +100,7 @@ class MuseBackend:
 
     channels = EEG_CHANNELS
     srate = EEG_SRATE
+    simulated = False
     STREAM_TIMEOUT = 20.0
 
     def __init__(self):
