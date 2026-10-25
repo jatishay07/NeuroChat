@@ -11,11 +11,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .device import Backend, BackendError, DeviceManager
-from .tutor import Tutor, TutorError, explain_request
+from .device import Backend, BackendError, BrowserHeadset, DeviceManager
+from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request
+from .webui import WebUI, WebUIError
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
 
@@ -24,9 +26,10 @@ class ConnectRequest(BaseModel):
     address: str
 
 
-def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
+def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None = None) -> FastAPI:
     device = DeviceManager(backend)
     tutor = tutor or Tutor()
+    webui = webui or WebUI(model=tutor.model)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -79,9 +82,60 @@ def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
         finally:
             device.unsubscribe(q)
 
+    @app.websocket("/ws/headset")
+    async def browser_headset(ws: WebSocket):
+        """A headset the portal connected with Web Bluetooth. The page sends {"type": "hello", "name": ...},
+        then {"type": "data", "packets": [[uuid, hex], ...]} batches of raw notifications, and
+        {"type": "lost", "message": ...} if Bluetooth drops. Closing the socket disconnects."""
+        await ws.accept()
+        headset, error = None, None
+        try:
+            while True:
+                msg = await ws.receive_json()
+                kind = msg.get("type")
+                if kind == "hello" and headset is None:
+                    headset = BrowserHeadset()
+                    try:
+                        await device.connect_browser(headset, str(msg.get("name") or "Muse")[:40])
+                    except BackendError as e:
+                        headset = None
+                        await ws.send_json({"type": "error", "message": str(e)})
+                        break
+                elif kind == "data" and headset is not None:
+                    if headset.closed:  # disconnected from the portal's button or another tab
+                        break
+                    headset.feed(msg.get("packets") or [])
+                elif kind == "lost":
+                    error = str(msg.get("message") or "Lost the headset.")[:200]
+                    break
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        finally:
+            if headset is not None:
+                await device.detach(headset, error)
+            try:
+                await ws.close()
+            except RuntimeError:
+                pass  # already closed
+
     @app.get("/api/tutor")
     async def tutor_status():
         return await tutor.status()
+
+    @app.get("/api/webui")
+    async def webui_status():
+        return await webui.status()
+
+    @app.get("/chat")
+    async def open_chat():
+        """Straight to the chat: a new tutor chat in Open WebUI, or the built-in chat page without it."""
+        if (await webui.status())["ready"]:
+            try:
+                await webui.ensure_tutor()
+                return RedirectResponse(webui.new_chat_url())
+            except WebUIError:
+                pass
+        return RedirectResponse("/chat.html")
 
     @app.websocket("/ws/chat")
     async def chat(ws: WebSocket):
@@ -89,15 +143,35 @@ def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
         {"type": "explain", "paragraph": ..., "title": ...} to start on a paragraph, or
         {"type": "ask", "text": ...} for a follow-up. Replies stream back as
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
-        or {"type": "error", "message": ...}."""
+        or {"type": "error", "message": ...}.
+        {"type": "continue"} copies the conversation into Open WebUI and answers
+        {"type": "continued", "url": ...} (or an error), so it can carry on there."""
         await ws.accept()
         history: list[dict] = []
+        title = "Chat with the tutor"
+        system = SYSTEM_PROMPT
         try:
             while True:
                 msg = await ws.receive_json()
+                if msg.get("type") == "continue":
+                    if not history:
+                        await ws.send_json({"type": "continued", "url": webui.new_chat_url()})
+                        continue
+                    try:
+                        url = await webui.import_chat(history, title)
+                    except WebUIError as e:
+                        await ws.send_json({"type": "error", "message": str(e)})
+                        continue
+                    await ws.send_json({"type": "continued", "url": url})
+                    continue
                 if msg.get("type") == "explain" and msg.get("paragraph"):
+                    title = f"Explaining: {msg['paragraph'][:60].strip()}…"
+                    system = SYSTEM_PROMPT
                     history = [{"role": "user", "content": explain_request(msg["paragraph"], msg.get("title"))}]
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
+                    if not history:  # a chat that starts with a question, not a paragraph
+                        title = msg["text"].strip()[:60]
+                        system = CHAT_PROMPT
                     history.append({"role": "user", "content": msg["text"].strip()})
                 else:
                     await ws.send_json({"type": "error", "message": "Unknown message."})
@@ -105,7 +179,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
                 await ws.send_json({"type": "start"})
                 reply = []
                 try:
-                    async for text in tutor.stream(history):
+                    async for text in tutor.stream(history, system):
                         reply.append(text)
                         await ws.send_json({"type": "token", "text": text})
                 except TutorError as e:

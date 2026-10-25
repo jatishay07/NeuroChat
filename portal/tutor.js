@@ -1,10 +1,31 @@
 // Tutor chat on the reading page: offers to re-explain a paragraph the reader was slow on,
 // streams the local model's answer over /ws/chat, and takes follow-up questions.
+// "Continue in Open WebUI" copies the conversation into Open WebUI to carry on there.
+// Also used on chat.html, the chat without eye tracking (no paragraphs, just questions).
 (() => {
   const $ = (id) => document.getElementById(id);
   const title = () => document.querySelector("#text h1")?.textContent.trim();
-  let ws = null, busy = false, pending = null, current = null, offered = null;
+  let ws = null, busy = false, current = null, offered = null, webui = false;
   const declined = new Set();
+
+  // The hand-off button, added here so the reading page's markup doesn't need to change.
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "quiet webui-btn";
+  more.textContent = "Continue in Open WebUI";
+  more.hidden = true;
+  more.onclick = async () => {
+    more.disabled = true;
+    more.textContent = "Opening Open WebUI…";
+    (await connect()).send(JSON.stringify({ type: "continue" }));
+  };
+  $("askForm").after(more);
+  const showMore = () => { more.hidden = !webui || !$("chat").children.length; };
+
+  async function checkWebUI() {
+    try { webui = (await (await fetch("/api/webui")).json()).ready; } catch { webui = false; }
+    showMore();
+  }
 
   async function checkStatus() {
     try {
@@ -36,7 +57,11 @@
   }
 
   function onEvent(e) {
-    if (e.type === "start") {
+    if (e.type === "continued") {
+      more.disabled = false;
+      more.textContent = "Continue in Open WebUI";
+      window.open(e.url, "_blank", "noopener");
+    } else if (e.type === "start") {
       current = bubble("tutor");
       current.classList.add("typing");
     } else if (e.type === "token") {
@@ -49,7 +74,10 @@
       busy = false;
       $("askBtn").disabled = false;
       $("askForm").hidden = false;
-      if (e.type === "error") checkStatus();
+      more.disabled = false;
+      more.textContent = "Continue in Open WebUI";
+      showMore();
+      if (e.type === "error") { checkStatus(); checkWebUI(); }
     }
   }
 
@@ -94,4 +122,5 @@
     send({ type: "ask", text }, text);
   };
   checkStatus();
+  checkWebUI();
 })();

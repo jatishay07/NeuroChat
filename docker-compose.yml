@@ -1,0 +1,22 @@
+# NeuroChat in one container: the app, Ollama with the Qwen model, and Open WebUI.
+#   docker compose up        then open http://127.0.0.1:8765 (Open WebUI: http://127.0.0.1:3000)
+# Uses the published image; `docker compose up --build` builds it from this folder instead.
+services:
+  neurochat:
+    image: ghcr.io/jatishay07/neurochat:latest
+    build: .
+    init: true
+    ports:
+      - "127.0.0.1:8765:8765"
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - neurochat:/app/backend/data   # Open WebUI's chats and settings
+    restart: unless-stopped
+    # NVIDIA GPU on Linux or Windows? Uncomment to let Ollama use it.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+volumes:
+  neurochat:

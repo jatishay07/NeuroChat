@@ -4,8 +4,10 @@
 #   --simulate      try it without a headset
 #   --skip-model    don't install Ollama or download the model
 #   --no-update     don't pull the latest version first
+#   --no-webui      don't start Open WebUI (the full chat portal on http://127.0.0.1:3000)
 # It also installs a `neurochat` command that runs this from any terminal.
 # NEUROCHAT_MODEL picks another Ollama model (default qwen3.5:4b, a 3.3 GB download).
+# NEUROCHAT_WEBUI=docker|local|off picks how Open WebUI runs (default: Docker when it's running).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
@@ -28,10 +30,24 @@ if (-not $env:NEUROCHAT_UPDATED -and -not ($args -contains "--no-update") -and (
 
 $Model = if ($env:NEUROCHAT_MODEL) { $env:NEUROCHAT_MODEL } else { "qwen3.5:4b" }
 $SkipModel = $args -contains "--skip-model"
-$Rest = @($args | Where-Object { $_ -ne "--skip-model" -and $_ -ne "--no-update" })
+$WebUIMode = if ($args -contains "--no-webui") { "off" } elseif ($env:NEUROCHAT_WEBUI) { $env:NEUROCHAT_WEBUI } else { "auto" }
+$Rest = @($args | Where-Object { $_ -ne "--skip-model" -and $_ -ne "--no-update" -and $_ -ne "--no-webui" })
 
 function Test-Python($exe, $pre) {
   try { & $exe @pre -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>$null; return $LASTEXITCODE -eq 0 } catch { return $false }
+}
+
+function Find-Uv {
+  $uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
+  $default = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
+  if (-not $uv -and (Test-Path $default)) { $uv = $default }
+  if (-not $uv) {
+    Write-Host "Installing uv (fetches the right Python, no admin rights needed)..."
+    $env:UV_NO_MODIFY_PATH = "1"
+    Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+    $uv = $default
+  }
+  return $uv
 }
 
 # Python 3.11+: use one that's installed, otherwise let uv download one (no admin rights needed).
@@ -42,13 +58,8 @@ if (-not (Test-Path $VenvPy)) {
   if (Test-Python "py" @("-3")) { & py -3 -m venv $Venv }
   elseif (Test-Python "python" @()) { & python -m venv $Venv }
   else {
-    $uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
-    if (-not $uv) {
-      Write-Host "No Python 3.11+ found; installing uv to fetch one..."
-      $env:UV_NO_MODIFY_PATH = "1"
-      Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
-      $uv = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
-    }
+    Write-Host "No Python 3.11+ found."
+    $uv = Find-Uv
     & $uv venv --quiet --seed --python 3.12 $Venv
   }
   if (-not (Test-Path $VenvPy)) { throw "Couldn't create the Python environment in .venv" }
@@ -129,7 +140,71 @@ try {
   }
 } catch { Write-Warning "Couldn't install the neurochat command; start.cmd still works." }
 
+# Open WebUI: the full chat portal, where tutor conversations carry on ("Continue in Open WebUI").
+# It runs in Docker when Docker is running, otherwise in its own Python environment in .webui.
+# Sign-in is off: it only listens on this computer and is for one person. Fewer background
+# requests (follow-up suggestions, tags, autocomplete) keep a small model responsive.
+$WebUIVars = @{ WEBUI_AUTH = "False"; ENABLE_OPENAI_API = "False"; DEFAULT_MODELS = "neurochat-tutor";
+  ENABLE_FOLLOW_UP_GENERATION = "False"; ENABLE_TAGS_GENERATION = "False"; ENABLE_AUTOCOMPLETE_GENERATION = "False" }
+$WebUIProc = $null
+$WebUIContainer = $null
+function Test-Docker {
+  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
+  docker info *> $null
+  return $LASTEXITCODE -eq 0
+}
+function Start-WebUIDocker {
+  if (-not (Test-Docker)) { throw "Docker isn't running." }
+  docker container inspect neurochat-webui *> $null
+  if ($LASTEXITCODE -eq 0) { docker start neurochat-webui | Out-Null }
+  else {
+    Write-Host "Starting Open WebUI in Docker (the first time downloads about 4 GB)..."
+    $envArgs = $WebUIVars.GetEnumerator() | ForEach-Object { "-e"; "$($_.Key)=$($_.Value)" }
+    docker run -d --name neurochat-webui -p 127.0.0.1:3000:8080 -v neurochat-webui:/app/backend/data `
+      -e OLLAMA_BASE_URL=http://host.docker.internal:11434 @envArgs ghcr.io/open-webui/open-webui:main | Out-Null
+  }
+  if ($LASTEXITCODE -ne 0) { throw "Docker couldn't start Open WebUI." }
+  $script:WebUIContainer = "neurochat-webui"
+}
+function Start-WebUILocal {
+  $dir = Join-Path $PSScriptRoot ".webui"
+  $exe = Join-Path $dir "Scripts\open-webui.exe"
+  if (-not (Test-Path $exe)) {
+    Write-Host "Installing Open WebUI (one time only, a few GB; takes several minutes)..."
+    $uv = Find-Uv
+    & $uv venv --quiet --python 3.11 $dir
+    & $uv pip install --quiet --python (Join-Path $dir "Scripts\python.exe") open-webui
+    if (-not (Test-Path $exe)) { throw "Open WebUI didn't install." }
+  }
+  $data = Join-Path $PSScriptRoot ".webui-data"
+  New-Item -ItemType Directory -Force $data | Out-Null
+  foreach ($kv in $WebUIVars.GetEnumerator()) { Set-Item "env:$($kv.Key)" $kv.Value }
+  $env:DATA_DIR = $data
+  $env:OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+  # Run it from its data folder: it keeps its secret key (.webui_secret_key) in the current folder.
+  $script:WebUIProc = Start-Process $exe -WorkingDirectory $data -ArgumentList "serve", "--host", "127.0.0.1", "--port", "3000" -WindowStyle Hidden -PassThru `
+    -RedirectStandardOutput (Join-Path $data "open-webui.log") -RedirectStandardError (Join-Path $data "open-webui.err.log")
+}
+function Stop-WebUI {
+  if ($WebUIProc) { Stop-Process -Id $WebUIProc.Id -Force -ErrorAction SilentlyContinue }
+  if ($WebUIContainer) { docker stop $WebUIContainer *> $null }
+}
+$webuiUp = $false
+try { Invoke-RestMethod http://127.0.0.1:3000/health -TimeoutSec 2 | Out-Null; $webuiUp = $true } catch {}
+if ($webuiUp) { Write-Host "Open WebUI is already running on http://127.0.0.1:3000" }
+elseif ($WebUIMode -ne "off") {
+  try {
+    if ($WebUIMode -eq "docker") { Start-WebUIDocker }
+    elseif ($WebUIMode -eq "local") { Start-WebUILocal }
+    # Keep using whichever it was set up with before, so earlier chats are still there.
+    elseif (-not (Test-Path (Join-Path $PSScriptRoot ".webui")) -and (Test-Docker)) {
+      try { Start-WebUIDocker } catch { Start-WebUILocal }
+    } else { Start-WebUILocal }
+    Write-Host "Open WebUI is starting on http://127.0.0.1:3000 (it takes up to a minute)."
+  } catch { Write-Warning "$_ Open WebUI didn't start, so chats stay in the NeuroChat page." }
+}
+
 $Url = "http://127.0.0.1:8765"
 Start-Job { Start-Sleep 2; Start-Process $using:Url } | Out-Null
 Write-Host "Opening $Url (Ctrl+C to stop)"
-& $VenvPy -m companion @Rest
+try { & $VenvPy -m companion @Rest } finally { Stop-WebUI }
