@@ -14,20 +14,27 @@ for a in "$@"; do
   if [ "$a" = "--skip-model" ]; then skip_model=1; else args+=("$a"); fi
 done
 
+# Python 3.11+: use one that's installed, otherwise let uv download one (no admin rights needed).
 PY=""
 for cand in python3.13 python3.12 python3.11 python3; do
-  if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+  if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
     PY="$cand"; break
   fi
 done
-if [ -z "$PY" ]; then
-  echo "NeuroChat needs Python 3.11 or newer. On a Mac: brew install python@3.12" >&2
-  exit 1
+UV=""
+if [ -z "$PY" ] && [ ! -d .venv ]; then
+  UV="$(command -v uv || true)"
+  [ -n "$UV" ] || [ ! -x "$HOME/.local/bin/uv" ] || UV="$HOME/.local/bin/uv"
+  if [ -z "$UV" ]; then
+    echo "No Python 3.11+ found; installing uv to fetch one…"
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
+    UV="$HOME/.local/bin/uv"
+  fi
 fi
 
 if [ ! -d .venv ]; then
   echo "First run: setting up (this takes a minute)…"
-  "$PY" -m venv .venv
+  if [ -n "$PY" ]; then "$PY" -m venv .venv; else "$UV" venv --quiet --seed --python 3.12 .venv; fi
 fi
 source .venv/bin/activate
 
