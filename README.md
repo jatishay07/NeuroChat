@@ -9,7 +9,7 @@ Everything runs on your own computer:
 
 | Piece | Folder | Status |
 |---|---|---|
-| Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection done |
+| Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection done; model downloads with `start.sh`, chat not wired yet |
 | Portal: connect screen, then the chat | `portal/` | Connect screen done |
 | Browser extension: paragraphs and webcam gaze on any page | `extension/` | Next |
 
@@ -27,8 +27,13 @@ cd NeuroChat
 ./start.sh              # with a Muse S Athena
 ```
 
-The first run sets up a virtualenv in `.venv` and installs everything; later runs start straight
-away. The portal opens in your browser at http://127.0.0.1:8765.
+The first run sets up a virtualenv in `.venv`, installs [Ollama](https://ollama.com) (with Homebrew
+on a Mac) and downloads the local model, **Qwen3.5 4B** (a 3.3 GB download, runs on 8 GB of RAM).
+Later runs start straight away. The portal opens in your browser at http://127.0.0.1:8765.
+
+- `./start.sh --skip-model` skips Ollama and the model download.
+- `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M ./start.sh` uses a smaller model (1.9 GB) on older machines;
+  `qwen3.5:9b` (6.6 GB) gives better answers on 16 GB machines.
 
 <details>
 <summary>Manual setup instead</summary>
