@@ -19,6 +19,9 @@ from .quality import channel_quality
 
 BUFFER_SECONDS = 4
 QUALITY_SECONDS = 2
+WAVE_SECONDS = 2             # the live waveform on the connect screen
+WAVE_POINTS = 60
+WAVE_INTERVAL = 0.25
 POLL_INTERVAL = 0.1
 STALL_SECONDS = 3.0          # no samples for this long while streaming → lost
 FIRST_DATA_TIMEOUT = 10.0    # connected but nothing arrives → give up
@@ -53,6 +56,7 @@ class DeviceManager:
             "srate": round(self.measured_srate, 1) if self.measured_srate else None,
             # The portal offers the fake headset only when that's what the companion runs with.
             "simulated": getattr(self._native or self.backend, "simulated", False),
+            "wave": self.wave() if self.state == "streaming" else None,
         }
 
     def subscribe(self) -> asyncio.Queue:
@@ -157,9 +161,19 @@ class DeviceManager:
         n = min(self._filled, int(seconds * self.backend.srate), self._buffer.shape[1])
         return self._buffer[:, self._buffer.shape[1] - n:]
 
+    def wave(self) -> list[list[float]]:
+        """The last few seconds per channel, averaged down to WAVE_POINTS, mean removed, in µV."""
+        w = self.window(WAVE_SECONDS)
+        n = w.shape[1] // WAVE_POINTS * WAVE_POINTS
+        if n == 0:
+            return [[] for _ in self.backend.channels]
+        w = w[:, -n:].reshape(len(w), WAVE_POINTS, -1).mean(axis=2)
+        w -= w.mean(axis=1, keepdims=True)
+        return np.round(w, 1).tolist()
+
     # ---- streaming loop ----------------------------------------------------------
     async def _pump(self) -> None:
-        started = last_data = last_quality = time.monotonic()
+        started = last_data = last_quality = last_wave = time.monotonic()
         rate_t0, rate_n = None, 0
         try:
             while True:
@@ -184,6 +198,10 @@ class DeviceManager:
                         self.measured_srate = rate_n / (now - rate_t0)
                     self.quality = channel_quality(self.window(QUALITY_SECONDS), self.backend.srate)
                     self._publish()
+                    last_wave = now
+                elif self.state == "streaming" and now - last_wave >= WAVE_INTERVAL:
+                    last_wave = now
+                    self._publish()  # carries the live waveform
         except asyncio.CancelledError:
             raise
         except Exception as e:  # BackendError carries a user-facing message; anything else is a bug
