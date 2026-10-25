@@ -1,0 +1,11 @@
+# Recordings are biometric data: never commit them.
+data/
+*.xdf
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+node_modules/
+.DS_Store

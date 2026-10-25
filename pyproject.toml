@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neurochat-companion"
+version = "0.1.0"
+description = "Local companion app for the struggle-aware tutor: headset connection, signals, detector, chat."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "numpy>=1.26",
+  "scipy>=1.12",
+]
+
+[project.optional-dependencies]
+# Real headset support. OpenMuse streams the Muse S Athena to LSL; bleak scans for it.
+hardware = [
+  "bleak>=0.22",
+  "pylsl>=1.16",
+  "OpenMuse @ https://github.com/DominiqueMakowski/OpenMuse/zipball/main",
+]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[tool.setuptools]
+packages = ["companion", "companion.device"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
