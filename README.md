@@ -74,9 +74,16 @@ longer than the rest, the tutor offers to explain it with the local model (strea
 `/ws/chat`), and you can ask follow-up questions.
 
 With a real headset, close the Muse app first (the headset talks to one app at a time).
-The companion scans over Bluetooth LE with [bleak](https://github.com/hbldh/bleak), starts
-[OpenMuse](https://github.com/DominiqueMakowski/OpenMuse) to stream the headset onto Lab Streaming
-Layer, and reads the EEG stream back with pylsl. On macOS, the terminal running it needs
+In **Chrome or Edge**, Find my headset connects it straight from the browser with
+[Web Bluetooth](https://developer.chrome.com/docs/capabilities/bluetooth): pick your Muse in the list
+the browser shows. The page forwards the raw Bluetooth packets to the companion, which decodes them
+with [OpenMuse](https://github.com/DominiqueMakowski/OpenMuse)'s parser. This works on macOS, Windows
+and ChromeOS, and also when the companion runs in Docker. On Linux, Chrome needs
+`chrome://flags/#enable-experimental-web-platform-features` turned on.
+
+In other browsers, or with **Search from the companion app**, the companion scans over Bluetooth LE
+itself with [bleak](https://github.com/hbldh/bleak), starts OpenMuse to stream the headset onto Lab
+Streaming Layer, and reads the EEG stream back with pylsl. On macOS, the terminal running it needs
 Bluetooth permission (System Settings → Privacy & Security → Bluetooth). On Linux, pylsl also
 needs liblsl (`conda install -c conda-forge liblsl`, or the package from the
 [liblsl releases](https://github.com/sccn/liblsl/releases)).
@@ -96,8 +103,9 @@ download is about 10 GB; after that it starts in under a minute and works offlin
 `docker stop neurochat` stops it and `docker start neurochat` starts it again, with your chats kept.
 From a clone, `docker compose up` does the same (`docker compose up --build` builds it from your copy).
 
-- **Simulated headset only, for now.** Docker on macOS and Windows can't reach Bluetooth, so the
-  container uses the fake headset. For a real Muse S Athena, use `./start.sh` or `start.cmd`.
+- **Headset: use Chrome or Edge.** Docker can't reach Bluetooth, so the browser connects the
+  Muse S Athena and passes its data to the container (see above). In other browsers the page offers a
+  simulated headset instead.
 - **Speed.** On a Mac, Ollama inside Docker runs on the CPU (Docker can't use Apple's GPU), so answers
   are slower than with `./start.sh`. With an NVIDIA GPU on Linux or Windows, add `--gpus all`.
 - Both ports listen on this computer only. The image is rebuilt and published from `main` by

@@ -27,6 +27,7 @@ FIRST_DATA_TIMEOUT = 10.0    # connected but nothing arrives → give up
 class DeviceManager:
     def __init__(self, backend: Backend):
         self.backend = backend
+        self._native: Backend | None = None   # the usual backend while a browser headset stands in
         self.state = "idle"
         self.error: str | None = None
         self.devices: list[DeviceInfo] = []
@@ -50,6 +51,8 @@ class DeviceManager:
             "channels": self.backend.channels,
             "quality": self.quality,
             "srate": round(self.measured_srate, 1) if self.measured_srate else None,
+            # The portal offers the fake headset only when that's what the companion runs with.
+            "simulated": getattr(self._native or self.backend, "simulated", False),
         }
 
     def subscribe(self) -> asyncio.Queue:
@@ -103,6 +106,32 @@ class DeviceManager:
             self.measured_srate = None
             self._task = asyncio.create_task(self._pump())
 
+    async def connect_browser(self, headset: Backend, name: str) -> None:
+        """Stream from a headset the browser connected (Web Bluetooth) instead of the usual backend."""
+        async with self._lock:
+            if self.state in ("connecting", "streaming"):
+                raise BackendError("Already connected. Disconnect first.")
+            self._native, self.backend = self.backend, headset
+            self.device = DeviceInfo(name, "browser")
+            self.devices = []
+            self._filled = 0
+            self.quality = ["unknown"] * len(self.backend.channels)
+            self.measured_srate = None
+            self._set("connecting")
+            self._task = asyncio.create_task(self._pump())
+
+    async def detach(self, headset: Backend, error: str | None = None) -> None:
+        """The browser's session ended: disconnect, or show what went wrong."""
+        if self.backend is not headset:
+            return  # already stopped (a disconnect, or the pump gave up)
+        if error is None:
+            await self.disconnect()
+            return
+        async with self._lock:
+            await self._stop()
+            self.device = None
+            self._set("error", error)
+
     async def disconnect(self) -> None:
         async with self._lock:
             await self._stop()
@@ -120,6 +149,8 @@ class DeviceManager:
                 pass
         self._task = None
         await self.backend.disconnect()
+        if self._native is not None:
+            self.backend, self._native = self._native, None
 
     def window(self, seconds: float) -> np.ndarray:
         """The most recent `seconds` of EEG, channels × samples."""

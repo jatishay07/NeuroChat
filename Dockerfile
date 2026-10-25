@@ -2,8 +2,8 @@
 # and Open WebUI. Nothing else to install:
 #   docker run -p 127.0.0.1:8765:8765 -p 127.0.0.1:3000:3000 -v neurochat:/app/backend/data ghcr.io/jatishay07/neurochat
 #
-# The real Muse S Athena needs Bluetooth, which Docker on macOS and Windows can't reach,
-# so the container runs the simulated headset. Run ./start.sh natively for the real one.
+# Docker can't reach Bluetooth, so the browser connects the Muse S Athena (Web Bluetooth in
+# Chrome or Edge) and forwards its packets to the companion. Otherwise it offers a simulated one.
 
 # Open WebUI's own image with Ollama built in.
 FROM ghcr.io/open-webui/open-webui:ollama

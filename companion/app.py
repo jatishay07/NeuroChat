@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .device import Backend, BackendError, DeviceManager
+from .device import Backend, BackendError, BrowserHeadset, DeviceManager
 from .tutor import Tutor, TutorError, explain_request
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
@@ -78,6 +78,42 @@ def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
             pass
         finally:
             device.unsubscribe(q)
+
+    @app.websocket("/ws/headset")
+    async def browser_headset(ws: WebSocket):
+        """A headset the portal connected with Web Bluetooth. The page sends {"type": "hello", "name": ...},
+        then {"type": "data", "packets": [[uuid, hex], ...]} batches of raw notifications, and
+        {"type": "lost", "message": ...} if Bluetooth drops. Closing the socket disconnects."""
+        await ws.accept()
+        headset, error = None, None
+        try:
+            while True:
+                msg = await ws.receive_json()
+                kind = msg.get("type")
+                if kind == "hello" and headset is None:
+                    headset = BrowserHeadset()
+                    try:
+                        await device.connect_browser(headset, str(msg.get("name") or "Muse")[:40])
+                    except BackendError as e:
+                        headset = None
+                        await ws.send_json({"type": "error", "message": str(e)})
+                        break
+                elif kind == "data" and headset is not None:
+                    if headset.closed:  # disconnected from the portal's button or another tab
+                        break
+                    headset.feed(msg.get("packets") or [])
+                elif kind == "lost":
+                    error = str(msg.get("message") or "Lost the headset.")[:200]
+                    break
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        finally:
+            if headset is not None:
+                await device.detach(headset, error)
+            try:
+                await ws.close()
+            except RuntimeError:
+                pass  # already closed
 
     @app.get("/api/tutor")
     async def tutor_status():
