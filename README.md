@@ -43,10 +43,17 @@ The first run takes a few minutes. It:
    `curl -fsSL https://ollama.com/install.sh | sh` on Linux);
 4. downloads the local model, **Qwen3.5 4B** (3.3 GB, runs on 8 GB of RAM).
 
-Later runs start straight away. Keep the window open while you use it: the portal at
+It also installs a **`neurochat` command**. From then on, open any terminal and type:
+
+```bash
+neurochat
+```
+
+Every run pulls the latest version from GitHub first (skipped when offline or if you've changed
+files), then starts. Later runs start in seconds. Keep the window open while you use it: the portal at
 http://127.0.0.1:8765 opens in your browser and only works while the companion is running.
 
-- `--skip-model` skips Ollama and the model download.
+- `--simulate` uses a fake headset; `--skip-model` skips Ollama and the model; `--no-update` skips the update.
 - `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M` picks a smaller model (1.9 GB) for older machines;
   `qwen3.5:9b` (6.6 GB) gives better answers on 16 GB machines.
 

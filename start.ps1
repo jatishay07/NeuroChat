@@ -3,13 +3,32 @@
 # then it launches the companion app and opens the portal.
 #   --simulate      try it without a headset
 #   --skip-model    don't install Ollama or download the model
+#   --no-update     don't pull the latest version first
+# It also installs a `neurochat` command that runs this from any terminal.
 # NEUROCHAT_MODEL picks another Ollama model (default qwen3.5:4b, a 3.3 GB download).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+# Update to the latest version on every run, then restart with the new script. Skipped when
+# offline, when you have local changes, or when you're on a branch other than main.
+if (-not $env:NEUROCHAT_UPDATED -and -not ($args -contains "--no-update") -and (Test-Path .git) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+  $branch = git rev-parse --abbrev-ref HEAD 2>$null
+  git diff --quiet HEAD 2>$null
+  if ($branch -eq "main" -and $LASTEXITCODE -eq 0) {
+    $before = git rev-parse HEAD
+    $env:GIT_TERMINAL_PROMPT = "0"
+    git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 pull --quiet --ff-only origin main 2>$null
+    if ($LASTEXITCODE -ne 0) { Write-Host "Couldn't check for updates (offline?); starting the version you have." }
+    elseif ((git rev-parse HEAD) -ne $before) { Write-Host "Updated NeuroChat to the latest version." }
+  }
+  $env:NEUROCHAT_UPDATED = "1"
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+  exit $LASTEXITCODE
+}
+
 $Model = if ($env:NEUROCHAT_MODEL) { $env:NEUROCHAT_MODEL } else { "qwen3.5:4b" }
 $SkipModel = $args -contains "--skip-model"
-$Rest = @($args | Where-Object { $_ -ne "--skip-model" })
+$Rest = @($args | Where-Object { $_ -ne "--skip-model" -and $_ -ne "--no-update" })
 
 function Test-Python($exe, $pre) {
   try { & $exe @pre -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>$null; return $LASTEXITCODE -eq 0 } catch { return $false }
@@ -40,8 +59,13 @@ $Stamp = Join-Path $Venv ".installed-$Extras"
 if (-not (Test-Path $Stamp) -or (Get-Item pyproject.toml).LastWriteTime -gt (Get-Item $Stamp).LastWriteTime) {
   & $VenvPy -m pip install --quiet --upgrade pip
   & $VenvPy -m pip install --quiet -e ".[$Extras]"
-  if ($LASTEXITCODE -ne 0) { throw "Installing NeuroChat failed" }
-  New-Item -ItemType File -Force $Stamp | Out-Null
+  if ($LASTEXITCODE -eq 0) { New-Item -ItemType File -Force $Stamp | Out-Null }
+  else {
+    # Bluetooth/LSL packages can fail on some machines; still start so eye tracking works.
+    & $VenvPy -m pip install --quiet -e ".[dev]"
+    if ($LASTEXITCODE -ne 0) { throw "Installing NeuroChat failed" }
+    Write-Warning "Headset support didn't install, so connecting a headset won't work yet; eye tracking still does."
+  }
 }
 
 # Local model: install Ollama if it's missing, make sure it's running, download the model once.
@@ -74,6 +98,20 @@ if (-not $SkipModel) {
   try { Setup-Model } catch { Write-Warning "$_ Carrying on without the local model; the headset screens still work." }
 }
 $env:NEUROCHAT_MODEL = $Model
+
+# `neurochat` command: a tiny launcher in %USERPROFILE%\.local\bin, added to your PATH.
+try {
+  $bin = Join-Path $env:USERPROFILE ".local\bin"
+  New-Item -ItemType Directory -Force $bin | Out-Null
+  $launcher = "@echo off`r`nrem Installed by NeuroChat. Updates and starts it.`r`ncall `"$PSScriptRoot\start.cmd`" %*`r`n"
+  $target = Join-Path $bin "neurochat.cmd"
+  if (-not (Test-Path $target) -or (Get-Content $target -Raw) -ne $launcher) { Set-Content -Path $target -Value $launcher -NoNewline -Encoding ASCII }
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  if (-not (($userPath -split ";") -contains $bin)) {
+    [Environment]::SetEnvironmentVariable("Path", (@($userPath, $bin) | Where-Object { $_ }) -join ";", "User")
+    Write-Host "Added the neurochat command. Open a new terminal window, then just type: neurochat"
+  }
+} catch { Write-Warning "Couldn't install the neurochat command; start.cmd still works." }
 
 $Url = "http://127.0.0.1:8765"
 Start-Job { Start-Sleep 2; Start-Process $using:Url } | Out-Null

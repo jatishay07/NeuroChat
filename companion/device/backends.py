@@ -110,7 +110,7 @@ class MuseBackend:
         try:
             from bleak import BleakScanner
         except ImportError as e:
-            raise BackendError('Bluetooth support is not installed. Run: pip install -e ".[hardware]"') from e
+            raise BackendError("Headset support isn't installed. Close this and run neurochat again to retry.") from e
         try:
             found = await BleakScanner.discover(timeout=timeout, return_adv=True)
         except Exception as e:  # bleak raises platform-specific errors when Bluetooth is off
@@ -126,11 +126,11 @@ class MuseBackend:
         # Look next to this Python too, so it's found even when the virtualenv isn't activated.
         exe = shutil.which("OpenMuse") or shutil.which("OpenMuse", path=os.path.dirname(sys.executable))
         if exe is None:
-            raise BackendError('OpenMuse is not installed. Run: pip install -e ".[hardware]"')
+            raise BackendError("Headset support isn't installed. Close this and run neurochat again to retry.")
         try:
             from pylsl import StreamInlet, resolve_streams
         except ImportError as e:
-            raise BackendError('pylsl is not installed. Run: pip install -e ".[hardware]"') from e
+            raise BackendError("Headset support isn't installed. Close this and run neurochat again to retry.") from e
         self._proc = subprocess.Popen(
             [exe, "stream", "--address", address],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
