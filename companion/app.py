@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .device import Backend, BackendError, BrowserHeadset, DeviceManager
+from .gaze import GazeSession, visit_json
 from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request
 from .webui import WebUI, WebUIError
 
@@ -38,6 +39,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     app = FastAPI(title="NeuroChat companion", lifespan=lifespan)
     app.state.device = device
+    gaze = GazeSession(device.eeg_between, lambda: device.backend.srate)
+    app.state.gaze = gaze
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1)(:\d+)?)$",
@@ -184,6 +187,38 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                 await ws.send_json({"type": "done"})
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
+
+    @app.websocket("/ws/gaze")
+    async def gaze_events(ws: WebSocket):
+        """Where the reader's eyes are, from the reading page. The page sends {"type": "enter", "paragraph": i}
+        when the gaze settles on a paragraph, {"type": "leave"} when it leaves the text or the face is lost,
+        and {"type": "reset"} to start a new reading. Each closed visit comes back as
+        {"type": "visit", "paragraph", "seconds", "engagement"}, engagement being the EEG engagement index
+        over the visit (null without headset data). A new connection starts a new reading."""
+        await ws.accept()
+        gaze.reset()
+        try:
+            while True:
+                msg = await ws.receive_json()
+                kind = msg.get("type")
+                if kind == "enter" and isinstance(msg.get("paragraph"), int) and msg["paragraph"] >= 0:
+                    visit = gaze.enter(msg["paragraph"])
+                elif kind == "leave":
+                    visit = gaze.leave()
+                elif kind == "reset":
+                    gaze.reset()
+                    visit = None
+                else:
+                    await ws.send_json({"type": "error", "message": "Unknown message."})
+                    continue
+                if visit is not None:
+                    await ws.send_json(visit_json(visit))
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            gaze.leave()
+
+    @app.get("/api/gaze")
+    async def gaze_summary():
+        return gaze.summary()
 
     if PORTAL_DIR.is_dir():
         app.mount("/", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")

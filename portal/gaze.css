@@ -8,3 +8,6 @@
 .gaze-dot { position: fixed; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; z-index: 40; pointer-events: none; background: rgba(229, 138, 0, .55); border: 2px solid rgba(255, 255, 255, .9); box-shadow: 0 0 0 1px rgba(11, 13, 18, .15); transition: transform 60ms linear; }
 /* While calibrating, keep the preview clear of the dots (corners and edge midpoints). */
 body.calibrating .cam { right: auto; bottom: auto; left: 50%; top: 74%; transform: translate(-50%, -50%); width: 180px; }
+/* A clicked calibration dot shrinks while its frames are collected: keep looking until it's gone. */
+.dot-target.hold { scale: .35; background: var(--good); border-color: var(--good); box-shadow: none; transition: scale .9s ease-in, background .3s; }
+.accuracy.warn { color: var(--bad); }
