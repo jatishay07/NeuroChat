@@ -1,0 +1,55 @@
+# NeuroChat in Docker:  docker compose up --build   then open http://127.0.0.1:8765
+#
+# By default both containers use the Ollama installed on this computer (./start.sh sets it up,
+# or https://ollama.com/download). That keeps the GPU: Ollama inside Docker on a Mac can't use it.
+# No Ollama on this computer? Run it in Docker instead:
+#   OLLAMA_HOST=http://ollama:11434 docker compose --profile ollama up --build
+#
+# The container uses a simulated headset; Docker on macOS and Windows can't reach Bluetooth.
+# For the real Muse S Athena, run ./start.sh (or start.cmd) instead.
+
+x-ollama-host: &ollama-host
+  extra_hosts:
+    - "host.docker.internal:host-gateway"   # lets Linux reach the host like Docker Desktop does
+
+services:
+  companion:
+    build: .
+    image: neurochat-companion
+    <<: *ollama-host
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      NEUROCHAT_MODEL: ${NEUROCHAT_MODEL:-qwen3.5:4b}
+      NEUROCHAT_WEBUI_URL: http://open-webui:8080
+      NEUROCHAT_WEBUI_PUBLIC_URL: http://127.0.0.1:3000
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    <<: *ollama-host
+    ports:
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - neurochat-webui:/app/backend/data
+    environment:
+      WEBUI_AUTH: "False"
+      ENABLE_OPENAI_API: "False"
+      OLLAMA_BASE_URL: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+    restart: unless-stopped
+
+  # Optional: only starts with --profile ollama. Downloads the model on first start.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - neurochat-ollama:/root/.ollama
+    environment:
+      NEUROCHAT_MODEL: ${NEUROCHAT_MODEL:-qwen3.5:4b}
+    entrypoint: ["/bin/sh", "-c", "ollama serve & until ollama list >/dev/null 2>&1; do sleep 1; done; ollama pull \"$$NEUROCHAT_MODEL\"; wait"]
+    restart: unless-stopped
+
+volumes:
+  neurochat-webui:
+  neurochat-ollama:
