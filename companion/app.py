@@ -128,13 +128,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @app.get("/chat")
     async def open_chat():
-        """Straight to the chat: a new tutor chat in Open WebUI, or the built-in chat page without it."""
-        if (await webui.status())["ready"]:
-            try:
-                await webui.ensure_tutor()
-                return RedirectResponse(webui.new_chat_url())
-            except WebUIError:
-                pass
+        """Straight to the chat: NeuroChat's own chat page. Open WebUI stays one click away from it."""
         return RedirectResponse("/chat.html")
 
     @app.websocket("/ws/chat")

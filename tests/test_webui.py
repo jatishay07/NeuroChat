@@ -68,16 +68,15 @@ def test_continue_copies_the_conversation_into_open_webui():
     assert tutor["base_model_id"] == "qwen3.5:4b" and tutor["params"]["system"]
 
 
-def test_chat_route_goes_to_open_webui_or_falls_back():
+def test_chat_route_opens_the_glass_chat_page():
+    # /chat is always NeuroChat's own page; Open WebUI is reached from it via "Continue in Open WebUI".
     with app_with(fake_webui()) as client:
         r = client.get("/chat")
-        assert r.status_code == 307 and r.headers["location"] == f"http://webui/?models={TUTOR_ID}"
+        assert r.status_code == 307 and r.headers["location"] == "/chat.html"
         assert client.get("/api/webui").json()["ready"] is True
     with app_with(fake_webui(down=True)) as client:
         assert client.get("/chat").headers["location"] == "/chat.html"
         assert client.get("/api/webui").json()["ready"] is False
-    with app_with(fake_webui(auth_required=True)) as client:  # someone else's Open WebUI with sign-in on
-        assert client.get("/chat").headers["location"] == "/chat.html"
 
 
 def test_continue_reports_when_open_webui_is_down():
