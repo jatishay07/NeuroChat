@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="tutor.css">
   <link rel="stylesheet" href="gaze.css">
+  <link rel="stylesheet" href="reader.css">
 </head>
 <body class="eyes">
   <header class="top">
@@ -45,7 +46,32 @@
       <p>When you plug your phone in, the charger pushes the electrons back the other way. Lithium ions travel back through the liquid to the graphite side and tuck themselves between its layers, ready to flow out again the next time you use the phone.</p>
       <p>Batteries wear out because every trip back and forth slightly damages the materials. Tiny cracks form, and some lithium gets trapped where it can no longer move. That is why a two-year-old phone does not last as long on a charge as a new one.</p>
     </article>
-    <aside class="panel">
+    <!-- The tutor's offer and answer are moved under the paragraph they're about (reader-ui.js).
+         No <p> inside them: eyes.js treats every <p> in #text as a paragraph to track. -->
+    <div id="offer" class="offer" hidden>
+      <span id="offerText"></span>
+      <div class="row">
+        <button id="offerYes" type="button" class="primary">Explain it</button>
+        <button id="offerNo" type="button" class="quiet">Not now</button>
+      </div>
+    </div>
+    <section id="tutor" class="tutor" aria-live="polite" hidden>
+      <div class="tutor-head">
+        <span id="tutorStatus" class="muted small"></span>
+        <button id="doneBtn" type="button" class="quiet">Got it</button>
+      </div>
+      <div id="chat" class="chat"></div>
+      <div class="quick">
+        <button type="button" class="quiet" data-ask="Explain it again, more simply.">Simpler</button>
+        <button type="button" class="quiet" data-ask="Give me a concrete example.">Example</button>
+      </div>
+      <form id="askForm" class="ask" hidden>
+        <input id="askInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" aria-label="Ask the tutor a follow-up question">
+        <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
+      </form>
+    </section>
+
+    <aside class="panel" id="insights" hidden>
       <h2>Where your eyes went</h2>
       <p class="muted small">Time spent on each paragraph, per 100 words. Paragraphs you were much slower on are marked, and the tutor offers to explain them. Click any row to ask about that paragraph.</p>
       <ol id="bars" class="bars"></ol>
@@ -54,25 +80,16 @@
         <button id="dotBtn" type="button" class="quiet">Hide gaze dot</button>
         <button id="camBtn" type="button" class="quiet">Hide camera</button>
         <button id="resetBtn" type="button" class="quiet">Reset times</button>
-        <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
       </div>
-      <section id="tutor" class="tutor" aria-live="polite">
-        <h2>Tutor</h2>
-        <p id="tutorStatus" class="muted small"></p>
-        <div id="offer" class="offer" hidden>
-          <p id="offerText"></p>
-          <div class="row">
-            <button id="offerYes" type="button" class="primary">Explain it</button>
-            <button id="offerNo" type="button" class="quiet">Not now</button>
-          </div>
-        </div>
-        <div id="chat" class="chat"></div>
-        <form id="askForm" class="ask" hidden>
-          <input id="askInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" aria-label="Ask the tutor a follow-up question">
-          <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
-        </form>
-      </section>
     </aside>
+
+    <nav class="dock" aria-label="Reading tools">
+      <span class="stat" id="eyeStat"><i></i>Eyes</span>
+      <span class="stat" id="headStat"><i></i>Headset</span>
+      <span class="sep" aria-hidden="true"></span>
+      <button id="insightsBtn" type="button" class="quiet" aria-expanded="false" aria-controls="insights">Insights</button>
+      <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
+    </nav>
   </div>
 
   <!-- Camera preview (the tracker reads frames from this video) and the gaze dot. -->
@@ -86,5 +103,6 @@
   <script src="vendor/webeyetrack/webeyetrack.js"></script>
   <script src="eyes.js"></script>
   <script src="tutor.js"></script>
+  <script src="reader-ui.js"></script>
 </body>
 </html>
