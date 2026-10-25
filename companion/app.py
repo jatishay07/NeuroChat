@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .device import Backend, BackendError, DeviceManager
+from .tutor import Tutor, TutorError, explain_request
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
 
@@ -23,8 +24,9 @@ class ConnectRequest(BaseModel):
     address: str
 
 
-def create_app(backend: Backend) -> FastAPI:
+def create_app(backend: Backend, tutor: Tutor | None = None) -> FastAPI:
     device = DeviceManager(backend)
+    tutor = tutor or Tutor()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -76,6 +78,44 @@ def create_app(backend: Backend) -> FastAPI:
             pass
         finally:
             device.unsubscribe(q)
+
+    @app.get("/api/tutor")
+    async def tutor_status():
+        return await tutor.status()
+
+    @app.websocket("/ws/chat")
+    async def chat(ws: WebSocket):
+        """One conversation with the tutor. The client sends
+        {"type": "explain", "paragraph": ..., "title": ...} to start on a paragraph, or
+        {"type": "ask", "text": ...} for a follow-up. Replies stream back as
+        {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
+        or {"type": "error", "message": ...}."""
+        await ws.accept()
+        history: list[dict] = []
+        try:
+            while True:
+                msg = await ws.receive_json()
+                if msg.get("type") == "explain" and msg.get("paragraph"):
+                    history = [{"role": "user", "content": explain_request(msg["paragraph"], msg.get("title"))}]
+                elif msg.get("type") == "ask" and msg.get("text", "").strip():
+                    history.append({"role": "user", "content": msg["text"].strip()})
+                else:
+                    await ws.send_json({"type": "error", "message": "Unknown message."})
+                    continue
+                await ws.send_json({"type": "start"})
+                reply = []
+                try:
+                    async for text in tutor.stream(history):
+                        reply.append(text)
+                        await ws.send_json({"type": "token", "text": text})
+                except TutorError as e:
+                    history.pop()
+                    await ws.send_json({"type": "error", "message": str(e)})
+                    continue
+                history.append({"role": "assistant", "content": "".join(reply)})
+                await ws.send_json({"type": "done"})
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
 
     if PORTAL_DIR.is_dir():
         app.mount("/", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
