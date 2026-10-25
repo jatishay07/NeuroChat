@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeuroChat · Eye tracking</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="eyes">
+  <!-- 1. Start the camera -->
+  <main class="card" id="intro">
+    <p class="eyebrow">Step 2 of 3</p>
+    <h1>Calibrate eye tracking</h1>
+    <p class="lede">Your webcam works out where on the screen you're looking. Nothing is recorded or sent anywhere: the video stays in this browser tab.</p>
+    <ul class="tips">
+      <li>Sit about an arm's length from the screen, face lit from the front.</li>
+      <li>Keep your head fairly still; move your eyes, not your head.</li>
+      <li>Glasses are fine. Avoid a bright window behind you.</li>
+    </ul>
+    <button id="startBtn" type="button" class="primary">Start camera</button>
+    <p class="muted small"><a href="/">Back to the headset</a></p>
+    <p id="message" class="message" role="status"></p>
+  </main>
+
+  <!-- 2. Calibration dots fill the screen -->
+  <div id="calib" class="calib" hidden>
+    <p class="calib-help" id="calibHelp">Look at each dot and click it 5 times. It turns green when it's done.</p>
+    <div id="dots"></div>
+  </div>
+
+  <!-- 3. Read and see where your eyes spent their time -->
+  <div id="reader" class="reader" hidden>
+    <article class="text" id="text">
+      <p class="eyebrow">Step 3 of 3 · Reading test</p>
+      <h1>How do batteries store energy?</h1>
+      <p>A battery is a small chemical factory that runs in reverse when you charge it. Inside, two different materials sit on either side of a liquid or gel. When you connect a device, one side gives up electrons and the other side takes them, and that flow of electrons through your device is the electric current.</p>
+      <p>The side that gives up electrons is called the anode, and the side that accepts them is the cathode. In a typical phone battery the anode is made of graphite, the same material as pencil lead, and the cathode is a metal oxide containing lithium.</p>
+      <p>The electrochemical potential difference between electrodes arises from the disparity in Gibbs free energy of lithium in each host lattice; intercalation into graphite is thermodynamically favoured only when an external overpotential exceeds the open-circuit voltage, whereupon Li<sup>+</sup> migrates through the electrolyte while electrons traverse the external circuit, preserving charge neutrality.</p>
+      <p>When you plug your phone in, the charger pushes the electrons back the other way. Lithium ions travel back through the liquid to the graphite side and tuck themselves between its layers, ready to flow out again the next time you use the phone.</p>
+      <p>Batteries wear out because every trip back and forth slightly damages the materials. Tiny cracks form, and some lithium gets trapped where it can no longer move. That is why a two-year-old phone does not last as long on a charge as a new one.</p>
+    </article>
+    <aside class="panel">
+      <h2>Where your eyes went</h2>
+      <p class="muted small">Time spent on each paragraph, per 100 words. Paragraphs you were much slower on than the rest are marked: that's where the tutor would offer to explain.</p>
+      <ol id="bars" class="bars"></ol>
+      <p class="accuracy small" id="accuracy"></p>
+      <div class="row">
+        <button id="dotBtn" type="button">Hide gaze dot</button>
+        <button id="camBtn" type="button">Hide camera</button>
+        <button id="resetBtn" type="button">Reset times</button>
+        <button id="recalBtn" type="button">Recalibrate</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- WebGazer (GPL-3.0) is loaded from a CDN at runtime rather than bundled into this repo. -->
+  <script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
+  <script src="eyes.js"></script>
+</body>
+</html>

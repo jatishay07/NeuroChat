@@ -8,8 +8,10 @@ so the rest of the app can be built and tested without a headset.
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from typing import Protocol
@@ -121,7 +123,8 @@ class MuseBackend:
         return sorted(devices, key=lambda d: -(d.rssi or -999))
 
     async def connect(self, address: str) -> None:
-        exe = shutil.which("OpenMuse")
+        # Look next to this Python too, so it's found even when the virtualenv isn't activated.
+        exe = shutil.which("OpenMuse") or shutil.which("OpenMuse", path=os.path.dirname(sys.executable))
         if exe is None:
             raise BackendError('OpenMuse is not installed. Run: pip install -e ".[hardware]"')
         try:

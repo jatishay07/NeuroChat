@@ -32,3 +32,5 @@ def test_portal_is_served():
     with TestClient(create_app(SimulatedBackend())) as client:
         r = client.get("/")
         assert r.status_code == 200 and "Connect your headset" in r.text
+        r = client.get("/eyes.html")
+        assert r.status_code == 200 and "Calibrate eye tracking" in r.text

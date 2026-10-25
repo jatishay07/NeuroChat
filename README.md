@@ -10,48 +10,68 @@ Everything runs on your own computer:
 | Piece | Folder | Status |
 |---|---|---|
 | Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection done; model downloads with `start.sh`, chat not wired yet |
-| Portal: connect screen, then the chat | `portal/` | Connect screen done |
+| Portal: connect screen, eye tracking, then the chat | `portal/` | Connect screen and eye-tracking test done |
 | Browser extension: paragraphs and webcam gaze on any page | `extension/` | Next |
 
 Build plan: [Struggle-Aware Tutor Build Plan](https://claude.ai/artifact/B7heEKCnARoA9t1QNRfA4D).
 
 ## Run it
 
-Needs Python 3.11+ (on a Mac: `brew install python@3.12`).
+Works on macOS, Windows and Linux. You only need `git` (or download the ZIP from GitHub);
+everything else installs itself on the first run.
+
+**macOS / Linux** (Terminal):
 
 ```bash
 git clone https://github.com/jatishay07/NeuroChat.git
 cd NeuroChat
-
 ./start.sh --simulate   # no headset: a simulated one (add --bad-channel TP10 to see a failing sensor)
 ./start.sh              # with a Muse S Athena
 ```
 
-The first run sets up a virtualenv in `.venv`, installs [Ollama](https://ollama.com) (the Mac app,
-or `curl -fsSL https://ollama.com/install.sh | sh` on Linux) and downloads the local model, **Qwen3.5 4B** (a 3.3 GB download, runs on 8 GB of RAM).
-Later runs start straight away. The portal opens in your browser at http://127.0.0.1:8765.
+**Windows**: clone or unzip the repo, then double-click `start.cmd`, or in PowerShell:
 
-- `./start.sh --skip-model` skips Ollama and the model download.
-- `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M ./start.sh` uses a smaller model (1.9 GB) on older machines;
+```powershell
+.\start.cmd --simulate
+```
+
+The first run takes a few minutes. It:
+
+1. uses Python 3.11+ if you have it, or downloads one with [uv](https://docs.astral.sh/uv/) (no admin rights needed);
+2. sets up a virtualenv in `.venv` and installs the companion app;
+3. installs [Ollama](https://ollama.com) if it's missing (the Mac app, the Windows installer, or
+   `curl -fsSL https://ollama.com/install.sh | sh` on Linux);
+4. downloads the local model, **Qwen3.5 4B** (3.3 GB, runs on 8 GB of RAM).
+
+Later runs start straight away. Keep the window open while you use it: the portal at
+http://127.0.0.1:8765 opens in your browser and only works while the companion is running.
+
+- `--skip-model` skips Ollama and the model download.
+- `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M` picks a smaller model (1.9 GB) for older machines;
   `qwen3.5:9b` (6.6 GB) gives better answers on 16 GB machines.
 
 <details>
 <summary>Manual setup instead</summary>
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"            # add ,hardware for a real headset: ".[dev,hardware]"
 python -m companion --simulate     # or: python -m companion
 ```
 </details>
 
-Click **Find my headset**, and connect.
+Click **Find my headset**, and connect. No headset with you? Click **Skip to eye tracking**: it
+calibrates [WebGazer](https://webgazer.cs.brown.edu) on your webcam (video never leaves the browser)
+and shows how long you spend on each paragraph of a test passage. WebGazer is GPL-3.0 and is
+loaded from a CDN at runtime, not bundled here.
 
 With a real headset, close the Muse app first (the headset talks to one app at a time).
 The companion scans over Bluetooth LE with [bleak](https://github.com/hbldh/bleak), starts
 [OpenMuse](https://github.com/DominiqueMakowski/OpenMuse) to stream the headset onto Lab Streaming
 Layer, and reads the EEG stream back with pylsl. On macOS, the terminal running it needs
-Bluetooth permission (System Settings → Privacy & Security → Bluetooth).
+Bluetooth permission (System Settings → Privacy & Security → Bluetooth). On Linux, pylsl also
+needs liblsl (`conda install -c conda-forge liblsl`, or the package from the
+[liblsl releases](https://github.com/sccn/liblsl/releases)).
 
 ## Tests
 
