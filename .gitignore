@@ -9,3 +9,6 @@ __pycache__/
 *.egg-info/
 node_modules/
 .DS_Store
+.webui/
+.webui-data/
+.webui_secret_key
