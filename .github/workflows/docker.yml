@@ -9,6 +9,11 @@ on:
     paths: [Dockerfile, docker/**, companion/**, portal/**, pyproject.toml, .github/workflows/docker.yml]
   workflow_dispatch:
 
+# A newer push to the same branch replaces a build still running, so main publishes its latest commit.
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
