@@ -1,0 +1,332 @@
+diff --git a/js/src/FaceLandmarkerClient.ts b/js/src/FaceLandmarkerClient.ts
+index 1e900e1..b5ee2a8 100644
+--- a/js/src/FaceLandmarkerClient.ts
++++ b/js/src/FaceLandmarkerClient.ts
+@@ -10,7 +10,7 @@ export default class FaceLandmarkerClient {
+ 
+   async initialize() {
+     const filesetResolver = await FilesetResolver.forVisionTasks(
+-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
++      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
+     );
+     this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+       baseOptions: {
+diff --git a/js/src/WebEyeTrack.ts b/js/src/WebEyeTrack.ts
+index 387a080..f6c5f35 100644
+--- a/js/src/WebEyeTrack.ts
++++ b/js/src/WebEyeTrack.ts
+@@ -76,16 +76,24 @@ export default class WebEyeTrack {
+     supportX: [],
+     supportY: [],
+     timestamps: [],
+-    ptType: ['calib']
++    ptType: []
+   };
+ 
++  // Recent eyes-open samples, so a calibration point can use every frame
++  // captured while the user looked at it instead of a single frame.
++  private recentSamples: { eyePatch: ImageData, headVector: number[], faceOrigin3D: number[], time: number }[] = [];
++  private maxRecentSamples: number = 60;
++  public maxSamplesPerPoint: number = 6; // each sample is a 512x128 eye patch held as a GPU tensor
++
+   // Configuration
+-  public maxPoints: number = 5;
++  public maxPoints: number = 5; // click points kept
+   public clickTTL: number = 60; // Time-to-live for click points in seconds
++  public maxCalibPoints: number = 12; // explicit calibration points kept, separately from clicks
+ 
+   constructor(
+       maxPoints: number = 5,
+-      clickTTL: number = 60 // Time-to-live for click points in seconds
++      clickTTL: number = 60, // Time-to-live for click points in seconds
++      maxCalibPoints: number = 12
+     ) {
+ 
+     // Initialize services
+@@ -96,6 +104,7 @@ export default class WebEyeTrack {
+     // Storing configs
+     this.maxPoints = maxPoints;
+     this.clickTTL = clickTTL;
++    this.maxCalibPoints = maxCalibPoints;
+   }
+ 
+   async initialize(baseUrl?: string): Promise<void> {
+@@ -105,29 +114,68 @@ export default class WebEyeTrack {
+   }
+ 
+   pruneCalibData() {
+-    
+-    // Prune the calibration data to keep only the last maxPoints points
+-    tf.tidy(() => {
+-      if (this.calibData.supportX.length > this.maxPoints) {
+-        this.calibData.supportX = this.calibData.supportX.slice(-this.maxPoints);
+-        this.calibData.supportY = this.calibData.supportY.slice(-this.maxPoints);
+-        this.calibData.timestamps = this.calibData.timestamps.slice(-this.maxPoints);
+-        this.calibData.ptType = this.calibData.ptType.slice(-this.maxPoints);
+-      }
++    // Keep the newest maxCalibPoints 'calib' points and the newest maxPoints 'click' points that are
++    // younger than clickTTL. Budgets are separate so clicks never push out the calibration.
++    const now = Date.now();
++    const ttl = this.clickTTL * 1000;
++    const keep: number[] = [];
++    let calibs = 0, clicks = 0;
++    for (let i = this.calibData.ptType.length - 1; i >= 0; i--) {
++      if (this.calibData.ptType[i] === 'click') {
++        if (clicks < this.maxPoints && now - this.calibData.timestamps[i] <= ttl) { keep.push(i); clicks++; }
++      } else if (calibs < this.maxCalibPoints) { keep.push(i); calibs++; }
++    }
++    keep.reverse();
++    const kept = new Set(keep);
++    this.calibData.supportX.forEach((s, i) => {
++      if (!kept.has(i)) tf.dispose([s.eyePatches, s.headVectors, s.faceOrigins3D]);
++    });
++    this.calibData.supportY.forEach((t, i) => { if (!kept.has(i)) tf.dispose(t); });
++    this.calibData.supportX = keep.map(i => this.calibData.supportX[i]);
++    this.calibData.supportY = keep.map(i => this.calibData.supportY[i]);
++    this.calibData.timestamps = keep.map(i => this.calibData.timestamps[i]);
++    this.calibData.ptType = keep.map(i => this.calibData.ptType[i]);
++  }
++
++  // Forget all calibration (e.g. before recalibrating from a new seat).
++  resetCalibration(): void {
++    this.calibData.supportX.forEach(s => tf.dispose([s.eyePatches, s.headVectors, s.faceOrigins3D]));
++    this.calibData.supportY.forEach(t => tf.dispose(t));
++    this.calibData = { supportX: [], supportY: [], timestamps: [], ptType: [] };
++    if (this.affineMatrix) {
++      tf.dispose(this.affineMatrix);
++      this.affineMatrix = null;
++    }
++    this.kalmanFilter = new KalmanFilter2D();
++    this.latestMouseClick = null;
++  }
+ 
+-      // Apply time-to-live pruning for 'click' points
+-      const currentTime = Date.now();
+-      const ttl = this.clickTTL * 1000; // Convert seconds to milliseconds
+-
+-      // Filter all together
+-      const filteredIndices = this.calibData.timestamps.map((timestamp, index) => {
+-        return (currentTime - timestamp <= ttl || this.calibData.ptType[index] !== 'click') ? index : -1;
+-      }).filter(index => index !== -1);
+-      this.calibData.supportX = filteredIndices.map(index => this.calibData.supportX[index]);
+-      this.calibData.supportY = filteredIndices.map(index => this.calibData.supportY[index]);
+-      this.calibData.timestamps = filteredIndices.map(index => this.calibData.timestamps[index]);
+-      this.calibData.ptType = filteredIndices.map(index => this.calibData.ptType[index]);
+-    })
++  // Calibrate on a known target: (x, y) is the gaze point in normalized screen coordinates
++  // ([-0.5, 0.5], centre = 0), and every eyes-open frame captured between fromMs and toMs
++  // (Date.now() time) becomes a training sample for it. Returns how many frames were used.
++  async calibrate(x: number, y: number, fromMs: number, toMs: number): Promise<number> {
++    if (!this.loaded) return 0;
++    let samples = this.recentSamples.filter(s => s.time >= fromMs && s.time <= toMs);
++    if (samples.length === 0) {
++      // On a slow machine no frame may have finished inside the window; the latest one will do if it's recent.
++      const last = this.recentSamples[this.recentSamples.length - 1];
++      if (!last || fromMs - last.time > 1000) return 0;
++      samples = [last];
++    }
++    if (samples.length > this.maxSamplesPerPoint) {
++      const step = samples.length / this.maxSamplesPerPoint;
++      samples = Array.from({ length: this.maxSamplesPerPoint }, (_, i) => samples[Math.floor(i * step)]);
++    }
++    await this.adapt(
++      samples.map(s => s.eyePatch),
++      samples.map(s => s.headVector),
++      samples.map(s => s.faceOrigin3D),
++      samples.map(() => [x, y]),
++      1,
++      1e-5,
++      'calib'
++    );
++    return samples.length;
+   }
+ 
+   async handleClick(x: number, y: number): Promise<void> {
+@@ -157,7 +205,10 @@ export default class WebEyeTrack {
+         [this.latestGazeResult?.eyePatch as ImageData],
+         [this.latestGazeResult?.headVector as number[]],
+         [this.latestGazeResult?.faceOrigin3D as number[]],
+-        [[x, y]]
++        [[x, y]],
++        1,
++        1e-5,
++        'click'
+       );
+     }
+   }
+@@ -338,6 +389,12 @@ export default class WebEyeTrack {
+         loss.data().then(val => console.log(`Loss = ${val[0].toFixed(4)}`));
+       }
+     });
++
++    // The concatenated batch is a copy; the per-point tensors stay in calibData.
++    if (this.calibData.supportX.length > 1) {
++      tf.dispose([tfEyePatches, tfHeadVectors, tfFaceOrigins3D, tfSupportY]);
++    }
++    opt.dispose();
+   }
+ 
+   async step(frame: ImageData, timestamp: number): Promise<GazeResult> {
+@@ -466,6 +523,10 @@ export default class WebEyeTrack {
+     // Debug: Printout the tf.Memory
+     // console.log(`[WebEyeTrack] tf.Memory: ${JSON.stringify(tf.memory().numTensors)} tensors, ${JSON.stringify(tf.memory().unreliable)} unreliable, ${JSON.stringify(tf.memory().numBytes)} bytes`);
+ 
++    // Remember this frame's inputs for calibrate()
++    this.recentSamples.push({ eyePatch, headVector, faceOrigin3D, time: Date.now() });
++    if (this.recentSamples.length > this.maxRecentSamples) this.recentSamples.shift();
++
+     // Update the latest gaze result
+     this.latestGazeResult = gaze_result;
+     return gaze_result;
+diff --git a/js/src/WebEyeTrackProxy.ts b/js/src/WebEyeTrackProxy.ts
+index eb8668e..813412f 100644
+--- a/js/src/WebEyeTrackProxy.ts
++++ b/js/src/WebEyeTrackProxy.ts
+@@ -3,12 +3,21 @@ import { GazeResult } from "./types";
+ 
+ // @ts-ignore
+ import WebEyeTrackWorker from "worker-loader?inline=no-fallback!./WebEyeTrackWorker.ts";
++export interface WebEyeTrackProxyOptions {
++  autoClick?: boolean;      // learn from every click on the page (default true); false = call click() yourself
++  maxPoints?: number;       // click points kept
++  clickTTL?: number;        // seconds a click point is kept
++  maxCalibPoints?: number;  // calibrate() points kept
++}
++
+ export default class WebEyeTrackProxy {
+   private worker: Worker;
++  private calibId = 0;
++  private pendingCalib = new Map<number, (samples: number) => void>();
+ 
+   public status: 'idle' | 'inference' | 'calib' = 'idle';
+ 
+-  constructor(webcamClient: WebcamClient) {
++  constructor(webcamClient: WebcamClient, options: WebEyeTrackProxyOptions = {}) {
+ 
+     // Initialize the WebEyeTrackWorker
+     this.worker = new WebEyeTrackWorker();
+@@ -46,6 +55,13 @@ export default class WebEyeTrackProxy {
+           this.onGazeResults(gazeResult);
+           break;
+ 
++        case 'calibrated': {
++          const resolve = this.pendingCalib.get(mess.data.id);
++          this.pendingCalib.delete(mess.data.id);
++          if (resolve) resolve(mess.data.samples);
++          break;
++        }
++
+         case 'statusUpdate':
+           this.status = mess.data.status;
+           break;
+@@ -61,10 +77,11 @@ export default class WebEyeTrackProxy {
+     // (e.g. GitHub Pages project sites served from a subpath) rather than
+     // always assuming the domain root.
+     const baseUrl = new URL('.', document.baseURI).toString();
+-    this.worker.postMessage({ type: 'init', payload: { baseUrl } });
++    const { maxPoints, clickTTL, maxCalibPoints } = options;
++    this.worker.postMessage({ type: 'init', payload: { baseUrl, maxPoints, clickTTL, maxCalibPoints } });
+ 
+     // Add mouse handler for re-calibration
+-    window.addEventListener('click', (e: MouseEvent) => {
++    if (options.autoClick !== false) window.addEventListener('click', (e: MouseEvent) => {
+       // Convert px to normalized coordinates
+       const normX = (e.clientX / window.innerWidth) - 0.5;
+       const normY = (e.clientY / window.innerHeight) - 0.5;
+@@ -73,6 +90,25 @@ export default class WebEyeTrackProxy {
+     })
+   }
+ 
++  // Calibrate on a target at normalized (x, y) in [-0.5, 0.5], using the frames the tracker processed
++  // between fromMs and toMs (Date.now() time). Resolves with the number of frames used.
++  calibrate(x: number, y: number, fromMs: number, toMs: number): Promise<number> {
++    const id = ++this.calibId;
++    return new Promise((resolve) => {
++      this.pendingCalib.set(id, resolve);
++      this.worker.postMessage({ type: 'calibrate', payload: { id, x, y, fromMs, toMs } });
++    });
++  }
++
++  // A click at normalized (x, y): a short-lived refinement point (needs autoClick: false to avoid doubles)
++  click(x: number, y: number): void {
++    this.worker.postMessage({ type: 'click', payload: { x, y } });
++  }
++
++  resetCalibration(): void {
++    this.worker.postMessage({ type: 'resetCalibration' });
++  }
++
+   // Callback for gaze results
+   onGazeResults: (gazeResult: GazeResult) => void = () => { 
+     console.warn('onGazeResults callback not set');
+diff --git a/js/src/WebEyeTrackWorker.ts b/js/src/WebEyeTrackWorker.ts
+index e7496d9..d107b8e 100644
+--- a/js/src/WebEyeTrackWorker.ts
++++ b/js/src/WebEyeTrackWorker.ts
+@@ -11,7 +11,7 @@ self.onmessage = async (e) => {
+ 
+   switch (type) {
+     case 'init':
+-      tracker = new WebEyeTrack();
++      tracker = new WebEyeTrack(payload?.maxPoints, payload?.clickTTL, payload?.maxCalibPoints);
+       await tracker.initialize(payload?.baseUrl);
+       self.postMessage({ type: 'ready' });
+       status = 'idle';
+@@ -23,9 +23,13 @@ self.onmessage = async (e) => {
+         status = 'inference';
+         self.postMessage({ type: 'statusUpdate', status: status});
+ 
+-        const result = await tracker.step(payload.frame as ImageData, payload.timestamp);
+-        lastTimestamp = payload.timestamp;
+-        self.postMessage({ type: 'stepResult', result });
++        try {
++          const result = await tracker.step(payload.frame as ImageData, payload.timestamp);
++          lastTimestamp = payload.timestamp;
++          self.postMessage({ type: 'stepResult', result });
++        } catch (err) {
++          console.error('[WebEyeTrackWorker] frame failed', err);
++        }
+ 
+         status = 'idle';
+         self.postMessage({ type: 'statusUpdate', status: status});
+@@ -37,11 +41,39 @@ self.onmessage = async (e) => {
+       status = 'calib';
+       self.postMessage({ type: 'statusUpdate', status: status});
+ 
+-      await tracker.handleClick(payload.x, payload.y);
++      try {
++        await tracker.handleClick(payload.x, payload.y);
++      } catch (err) {
++        console.error('[WebEyeTrackWorker] click calibration failed', err);
++      }
++
++      status = 'idle';
++      self.postMessage({ type: 'statusUpdate', status: status});
++      break;
++
++    case 'calibrate': {
++      // Calibration point with a known target, using the frames captured while the user looked at it
++      status = 'calib';
++      self.postMessage({ type: 'statusUpdate', status: status});
++
++      // try/finally: an error here must not leave the status stuck on 'calib', which stops all tracking
++      let samples = 0;
++      try {
++        samples = await tracker.calibrate(payload.x, payload.y, payload.fromMs, payload.toMs);
++      } catch (err) {
++        console.error('[WebEyeTrackWorker] calibration failed', err);
++      } finally {
++        self.postMessage({ type: 'calibrated', id: payload.id, samples });
++      }
+ 
+       status = 'idle';
+       self.postMessage({ type: 'statusUpdate', status: status});
+       break;
++    }
++
++    case 'resetCalibration':
++      tracker.resetCalibration();
++      break;
+ 
+     default:
+       console.warn(`[WebEyeTrackWorker] Unknown message type: ${type}`);
