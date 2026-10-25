@@ -77,3 +77,4 @@
 .recap-note i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
 .recap-note div { flex: 1; }
 .recap-note button { flex: none; }
+.chat .msg.tutor { display: block; border-top: 0; padding-top: 0; } /* tutor.css .tutor (the section) also matches these */

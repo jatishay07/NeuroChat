@@ -72,7 +72,8 @@ python -m companion --simulate     # or: python -m companion
 </details>
 
 Click **Find my headset**, and connect. Just want the chatbot? Click **go straight to the chat**: it opens
-a new chat with the **NeuroChat Tutor** in Open WebUI (or a simple chat page if Open WebUI isn't running).
+NeuroChat's own chat with the tutor. After a reply, **Continue in Open WebUI** moves the conversation there if you
+want Open WebUI's history and search.
 No headset with you? Click **Skip to eye tracking**: it
 calibrates [WebEyeTrack](https://github.com/RedForestAI/WebEyeTrack) on your webcam (video never leaves the browser)
 and shows how long you spend on each paragraph of a test passage. When a paragraph takes you much

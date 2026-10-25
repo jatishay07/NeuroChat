@@ -70,6 +70,7 @@ function render(s) {
       `<g class="sensor"><circle cx="${x}" cy="${y}" r="13" class="q-${q}"><title>${ch}: ${q}</title></circle>` +
       `<text x="${x}" y="${ch.startsWith('TP') ? y - 19 : y + 30}" text-anchor="middle">${ch}</text></g>`);
   });
+  renderWaves(s);
   const tips = s.channels.map((ch, i) => TIPS[s.quality[i]]?.(ch)).filter(Boolean);
   $("tips").innerHTML = tips.map((t) => `<li>${t}</li>`).join("");
   const allGood = s.state === "streaming" && s.quality.every((q) => q === "good");
@@ -101,6 +102,26 @@ async function connectBluetooth() {
     // Closing the browser's list isn't an error.
     say(/cancel/i.test(e.message) ? "" : e.message || String(e), !/cancel/i.test(e.message));
   }
+}
+
+// Live waveforms under the head: the last 2 s per channel, centred on 0 µV, drawn at a fixed scale
+// so a noisy or loose sensor visibly jumps around.
+const WAVE_UV = 100; // ±µV that fills the row
+function renderWaves(s) {
+  const box = $("waves");
+  box.hidden = !s.wave;
+  if (!s.wave) return;
+  box.innerHTML = "";
+  s.channels.forEach((ch, i) => {
+    const w = s.wave[i] || [];
+    const q = s.quality[i] || "unknown";
+    const pts = w.map((v, j) => `${(j / Math.max(1, w.length - 1)) * 300},${11 - Math.max(-1, Math.min(1, v / WAVE_UV)) * 10}`).join(" ");
+    const row = document.createElement("div");
+    row.className = `wave q-${q}`;
+    row.innerHTML = `<span></span><svg viewBox="0 0 300 22" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+    row.querySelector("span").textContent = ch;
+    box.append(row);
+  });
 }
 
 async function scan() {
