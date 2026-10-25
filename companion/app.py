@@ -33,7 +33,9 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        setup = asyncio.create_task(webui.prepare())
         yield
+        setup.cancel()
         await device.disconnect()   # stop OpenMuse cleanly when the app exits
 
     app = FastAPI(title="NeuroChat companion", lifespan=lifespan)

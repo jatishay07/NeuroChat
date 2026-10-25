@@ -6,6 +6,7 @@ Open WebUI (Qwen3.5 in Ollama plus the tutor's instructions), and copies convers
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 import uuid
@@ -74,26 +75,42 @@ class WebUI:
                              "if you use your own Open WebUI, set NEUROCHAT_WEBUI_URL to NeuroChat's instead.")
         self._token = r.json()["token"]
 
+    async def _upsert_model(self, form: dict) -> None:
+        r = await self._request("GET", "/api/v1/models/model", params={"id": form["id"]})
+        if r.status_code == 200 and r.json():
+            r = await self._request("POST", "/api/v1/models/model/update", params={"id": form["id"]}, json=form)
+        else:
+            r = await self._request("POST", "/api/v1/models/create", json=form)
+        if r.status_code >= 400:
+            raise WebUIError(f"Open WebUI couldn't set up the model {form['id']}: {r.text[:200]}")
+
     async def ensure_tutor(self) -> None:
-        """Create or refresh the "NeuroChat Tutor" model in Open WebUI."""
+        """Create or refresh the "NeuroChat Tutor" model in Open WebUI, and tune the plain model too."""
         if self._model_ready:
             return
-        form = {
+        # A small local model needs short prompts. By default Open WebUI attaches ~40 built-in tool
+        # definitions (calendar, memory, notes...) to every request and Qwen thinks before answering;
+        # on a 4B model that's a long wait with an empty reply. Turn both off.
+        fast = {"capabilities": {"builtin_tools": False}}
+        await self._upsert_model({
             "id": TUTOR_ID,
             "base_model_id": self.model,
             "name": "NeuroChat Tutor",
             "meta": {"description": f"{self.model} on this computer, as a patient tutor.",
-                     "profile_image_url": "/static/favicon.png", "capabilities": {}},
+                     "profile_image_url": "/static/favicon.png", **fast},
             "params": {"system": CHAT_PROMPT, "temperature": 0.4, "think": False},
             "is_active": True,
-        }
-        r = await self._request("GET", "/api/v1/models/model", params={"id": TUTOR_ID})
-        if r.status_code == 200 and r.json():
-            r = await self._request("POST", "/api/v1/models/model/update", params={"id": TUTOR_ID}, json=form)
-        else:
-            r = await self._request("POST", "/api/v1/models/create", json=form)
-        if r.status_code >= 400:
-            raise WebUIError(f"Open WebUI couldn't set up the tutor model: {r.text[:200]}")
+        })
+        # Same settings for the plain model when it's picked from the model list
+        # (an entry with the Ollama model's own id overrides its defaults in Open WebUI).
+        await self._upsert_model({
+            "id": self.model,
+            "base_model_id": None,
+            "name": self.model,
+            "meta": {"profile_image_url": "/static/favicon.png", **fast},
+            "params": {"think": False},
+            "is_active": True,
+        })
         # Skip the "What's new" release notes that otherwise cover the first chat after each update.
         r = await self._request("GET", "/api/v1/users/user/settings")
         settings = (r.json() if r.status_code == 200 else None) or {}
@@ -101,6 +118,20 @@ class WebUI:
             settings.setdefault("ui", {})["showChangelog"] = False
             await self._request("POST", "/api/v1/users/user/settings/update", json=settings)
         self._model_ready = True
+
+    async def prepare(self, wait: float = 300.0, every: float = 5.0) -> None:
+        """At startup: wait for Open WebUI (it starts slower than the companion) and set up the
+        models, so they're fast even when someone opens Open WebUI directly."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + wait
+        while loop.time() < deadline:
+            if (await self.status())["ready"]:
+                try:
+                    await self.ensure_tutor()
+                except WebUIError:
+                    pass
+                return
+            await asyncio.sleep(every)
 
     def new_chat_url(self) -> str:
         return f"{self.public_url}/?models={TUTOR_ID}"
