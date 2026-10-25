@@ -37,7 +37,9 @@ jobs:
       - name: Build
         run: docker build --platform linux/${{ matrix.arch }} -t "$IMAGE:latest-${{ matrix.arch }}" .
       - name: Check the model is inside
-        run: docker run --rm --platform linux/${{ matrix.arch }} --entrypoint ollama "$IMAGE:latest-${{ matrix.arch }}" list
+        run: |
+          docker run --rm --platform linux/${{ matrix.arch }} --entrypoint sh "$IMAGE:latest-${{ matrix.arch }}" -c \
+            'ollama serve >/dev/null 2>&1 & until ollama list >/dev/null 2>&1; do sleep 1; done; ollama list | tee /dev/stderr | grep -q "^$NEUROCHAT_MODEL "'
       - name: Start it and ask the model something
         if: matrix.arch == 'amd64'
         run: |
