@@ -1,4 +1,5 @@
 import json
+import time
 
 import httpx
 from fastapi.testclient import TestClient
@@ -66,6 +67,9 @@ def test_continue_copies_the_conversation_into_open_webui():
     assert "Intercalation" in chat["messages"][0]["content"] and chat["title"].startswith("Explaining: Intercalation")
     tutor = webui.state["models"][TUTOR_ID]
     assert tutor["base_model_id"] == "qwen3.5:4b" and tutor["params"]["system"]
+    assert tutor["meta"]["capabilities"]["builtin_tools"] is False and tutor["params"]["think"] is False
+    plain = webui.state["models"]["qwen3.5:4b"]
+    assert plain["meta"]["capabilities"]["builtin_tools"] is False and plain["params"]["think"] is False
 
 
 def test_chat_route_opens_the_glass_chat_page():
@@ -85,3 +89,13 @@ def test_continue_reports_when_open_webui_is_down():
         ws.send_json({"type": "continue"})
         e = ws.receive_json()
         assert e["type"] == "error" and "Open WebUI isn't running" in e["message"]
+
+
+def test_models_are_set_up_at_startup():
+    webui = fake_webui()
+    with app_with(webui):
+        for _ in range(50):
+            if "qwen3.5:4b" in webui.state["models"]:
+                break
+            time.sleep(0.05)
+    assert {TUTOR_ID, "qwen3.5:4b"} <= set(webui.state["models"])
