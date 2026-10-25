@@ -16,3 +16,10 @@
 .ask { display: flex; gap: 6px; align-items: center; padding: 4px 4px 4px 16px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9); }
 .ask input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--fg); outline: none; }
 .ask button.primary { width: 36px; min-height: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 16px; flex: none; }
+.webui-btn { justify-self: center; }
+.webui-btn[hidden] { display: none; }
+/* chat.html: the tutor on its own, without the reading page */
+.chat-card { max-width: 560px; text-align: left; }
+.chat-card h1, .chat-card .lede, .chat-card .skip { text-align: center; }
+.chat-card .tutor { border-top: 0; padding-top: 0; }
+.chat-card .chat { max-height: 56vh; }

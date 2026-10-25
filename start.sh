@@ -4,8 +4,10 @@
 #   --simulate      try it without a headset
 #   --skip-model    don't install Ollama or download the model
 #   --no-update     don't pull the latest version first
+#   --no-webui      don't start Open WebUI (the full chat portal on http://127.0.0.1:3000)
 # It also installs a `neurochat` command that runs this script from anywhere.
 # NEUROCHAT_MODEL picks another Ollama model (default qwen3.5:4b, a 3.3 GB download).
+# NEUROCHAT_WEBUI=docker|local|off picks how Open WebUI runs (default: Docker when it's running).
 set -euo pipefail
 cd "$(dirname "$0")"
 REPO="$(pwd)"
@@ -27,10 +29,12 @@ fi
 
 MODEL="${NEUROCHAT_MODEL:-qwen3.5:4b}"
 skip_model=0
+WEBUI_MODE="${NEUROCHAT_WEBUI:-auto}"
 args=()
 for a in "$@"; do
   case "$a" in
     --skip-model) skip_model=1 ;;
+    --no-webui) WEBUI_MODE=off ;;
     --no-update) ;;
     *) args+=("$a") ;;
   esac
@@ -44,14 +48,19 @@ for cand in python3.13 python3.12 python3.11 python3; do
   fi
 done
 UV=""
-if [ -z "$PY" ] && [ ! -d .venv ]; then
+find_uv() {
+  [ -z "$UV" ] || return 0
   UV="$(command -v uv || true)"
   [ -n "$UV" ] || [ ! -x "$HOME/.local/bin/uv" ] || UV="$HOME/.local/bin/uv"
   if [ -z "$UV" ]; then
-    echo "No Python 3.11+ found; installing uv to fetch one…"
+    echo "Installing uv (fetches the right Python, no admin rights needed)…"
     curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
     UV="$HOME/.local/bin/uv"
   fi
+}
+if [ -z "$PY" ] && [ ! -d .venv ]; then
+  echo "No Python 3.11+ found."
+  find_uv
 fi
 
 if [ ! -d .venv ]; then
@@ -172,10 +181,78 @@ install_command() {
 }
 install_command || echo "Couldn't install the neurochat command; ./start.sh still works." >&2
 
+# Open WebUI: the full chat portal, where tutor conversations carry on ("Continue in Open WebUI").
+# It runs in Docker when Docker is running, otherwise in its own Python environment in .webui.
+# Sign-in is off: it only listens on this computer and is for one person.
+WEBUI_PORT=3000
+WEBUI_PID=""
+WEBUI_CONTAINER=""
+# Fewer background requests (follow-up suggestions, tags, autocomplete) keep a small model responsive.
+webui_vars=(WEBUI_AUTH=False ENABLE_OPENAI_API=False DEFAULT_MODELS=neurochat-tutor ENABLE_FOLLOW_UP_GENERATION=False
+  ENABLE_TAGS_GENERATION=False ENABLE_AUTOCOMPLETE_GENERATION=False)
+start_webui_docker() {
+  command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo "Docker isn't running." >&2; return 1; }
+  if docker container inspect neurochat-webui >/dev/null 2>&1; then
+    docker start neurochat-webui >/dev/null || return 1
+  else
+    echo "Starting Open WebUI in Docker (the first time downloads about 4 GB)…"
+    local net env=() v
+    for v in "${webui_vars[@]}"; do env+=(-e "$v"); done
+    if [ "$(uname)" = Linux ]; then
+      # Ollama only listens on 127.0.0.1, which a container can reach only on the host's network.
+      net=(--network host -e "PORT=$WEBUI_PORT" -e HOST=127.0.0.1 -e OLLAMA_BASE_URL=http://127.0.0.1:11434)
+    else
+      net=(-p "127.0.0.1:$WEBUI_PORT:8080" -e OLLAMA_BASE_URL=http://host.docker.internal:11434)
+    fi
+    docker run -d --name neurochat-webui -v neurochat-webui:/app/backend/data "${net[@]}" "${env[@]}" \
+      ghcr.io/open-webui/open-webui:main >/dev/null || return 1
+  fi
+  WEBUI_CONTAINER=neurochat-webui
+}
+start_webui_local() {
+  local venv="$REPO/.webui"
+  if [ ! -x "$venv/bin/open-webui" ]; then
+    echo "Installing Open WebUI (one time only, a few GB; takes several minutes)…"
+    find_uv
+    "$UV" venv --quiet --python 3.11 "$venv" && "$UV" pip install --quiet --python "$venv/bin/python" open-webui || return 1
+  fi
+  mkdir -p "$REPO/.webui-data"
+  # Run it from its data folder: it keeps its secret key (.webui_secret_key) in the current folder.
+  (cd "$REPO/.webui-data" && exec env DATA_DIR="$REPO/.webui-data" "${webui_vars[@]}" OLLAMA_BASE_URL=http://127.0.0.1:11434 \
+    "$venv/bin/open-webui" serve --host 127.0.0.1 --port "$WEBUI_PORT" >open-webui.log 2>&1) &
+  WEBUI_PID=$!
+}
+stop_webui() {
+  [ -z "$WEBUI_PID" ] || kill "$WEBUI_PID" 2>/dev/null || true
+  [ -z "$WEBUI_CONTAINER" ] || docker stop "$WEBUI_CONTAINER" >/dev/null 2>&1 || true
+}
+start_webui() {
+  case "$WEBUI_MODE" in
+    docker) start_webui_docker ;;
+    local) start_webui_local ;;
+    # Keep using whichever it was set up with before, so earlier chats are still there.
+    *) if [ ! -d "$REPO/.webui" ] && command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+         start_webui_docker || start_webui_local
+       else
+         start_webui_local
+       fi ;;
+  esac
+}
+if curl -fsS --max-time 2 "http://127.0.0.1:$WEBUI_PORT/health" >/dev/null 2>&1; then
+  echo "Open WebUI is already running on http://127.0.0.1:$WEBUI_PORT"
+elif [ "$WEBUI_MODE" != off ]; then
+  if start_webui; then
+    echo "Open WebUI is starting on http://127.0.0.1:$WEBUI_PORT (it takes up to a minute)."
+  else
+    echo "Open WebUI didn't start, so chats stay in the NeuroChat page." >&2
+  fi
+fi
+trap stop_webui EXIT
+
 url="http://127.0.0.1:8765"
 opener=""
 command -v open >/dev/null && opener=open
 command -v xdg-open >/dev/null && opener=xdg-open
 [ -n "$opener" ] && ( sleep 2; "$opener" "$url" ) >/dev/null 2>&1 &
 echo "Opening $url (Ctrl+C to stop)"
-exec python -m companion ${args[@]+"${args[@]}"}
+python -m companion ${args[@]+"${args[@]}"} || true
