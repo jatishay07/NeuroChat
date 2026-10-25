@@ -17,21 +17,30 @@ Build plan: [Struggle-Aware Tutor Build Plan](https://claude.ai/artifact/B7heEKC
 
 ## Run it
 
-Needs Python 3.11+.
+Needs Python 3.11+ (on a Mac: `brew install python@3.12`).
+
+```bash
+git clone https://github.com/jatishay07/NeuroChat.git
+cd NeuroChat
+
+./start.sh --simulate   # no headset: a simulated one (add --bad-channel TP10 to see a failing sensor)
+./start.sh              # with a Muse S Athena
+```
+
+The first run sets up a virtualenv in `.venv` and installs everything; later runs start straight
+away. The portal opens in your browser at http://127.0.0.1:8765.
+
+<details>
+<summary>Manual setup instead</summary>
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-
-# No headset? Use the simulated one (add --bad-channel TP10 to see a failing sensor):
-python -m companion --simulate
-
-# With a Muse S Athena:
-pip install -e ".[hardware]"
-python -m companion
+pip install -e ".[dev]"            # add ,hardware for a real headset: ".[dev,hardware]"
+python -m companion --simulate     # or: python -m companion
 ```
+</details>
 
-Then open http://127.0.0.1:8765, click **Find my headset**, and connect.
+Click **Find my headset**, and connect.
 
 With a real headset, close the Muse app first (the headset talks to one app at a time).
 The companion scans over Bluetooth LE with [bleak](https://github.com/hbldh/bleak), starts
