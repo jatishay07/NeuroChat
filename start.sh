@@ -212,7 +212,7 @@ start_webui_docker() {
 start_webui_local() {
   local venv="$REPO/.webui"
   if [ ! -x "$venv/bin/open-webui" ]; then
-    echo "Installing Open WebUI (one time only, about 2 GB)…"
+    echo "Installing Open WebUI (one time only, a few GB; takes several minutes)…"
     find_uv
     "$UV" venv --quiet --python 3.11 "$venv" && "$UV" pip install --quiet --python "$venv/bin/python" open-webui || return 1
   fi

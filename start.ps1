@@ -170,7 +170,7 @@ function Start-WebUILocal {
   $dir = Join-Path $PSScriptRoot ".webui"
   $exe = Join-Path $dir "Scripts\open-webui.exe"
   if (-not (Test-Path $exe)) {
-    Write-Host "Installing Open WebUI (one time only, about 2 GB)..."
+    Write-Host "Installing Open WebUI (one time only, a few GB; takes several minutes)..."
     $uv = Find-Uv
     & $uv venv --quiet --python 3.11 $dir
     & $uv pip install --quiet --python (Join-Path $dir "Scripts\python.exe") open-webui

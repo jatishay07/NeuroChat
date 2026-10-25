@@ -9,3 +9,6 @@ data/
 node_modules/
 extension/
 tests/
+.webui/
+.webui-data/
+.webui_secret_key

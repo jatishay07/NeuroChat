@@ -44,7 +44,7 @@ The first run takes a few minutes. It:
    (`curl -fsSL https://ollama.com/install.sh | sh` on macOS and Linux, the installer on Windows);
 4. downloads the local model, **Qwen3.5 4B** (3.3 GB, runs on 8 GB of RAM);
 5. installs [Open WebUI](https://openwebui.com), the chat portal on http://127.0.0.1:3000. If Docker is
-   running it uses Open WebUI's Docker image (about 4 GB); otherwise it installs it into `.webui` (about 2 GB).
+   running it uses Open WebUI's Docker image (about 4 GB); otherwise it installs it into `.webui` (a few GB).
 
 It also installs a **`neurochat` command**. From then on, open any terminal and type:
 
