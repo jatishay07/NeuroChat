@@ -81,6 +81,29 @@ Bluetooth permission (System Settings → Privacy & Security → Bluetooth). On 
 needs liblsl (`conda install -c conda-forge liblsl`, or the package from the
 [liblsl releases](https://github.com/sccn/liblsl/releases)).
 
+## Run it with Docker
+
+If you'd rather not install Python, [Docker](https://www.docker.com/products/docker-desktop/) runs the
+app and the [Open WebUI](https://github.com/open-webui/open-webui) chat for you:
+
+```bash
+docker compose up --build
+```
+
+Then open http://127.0.0.1:8765 for the app and http://127.0.0.1:3000 for Open WebUI.
+
+- **Simulated headset only.** Docker on macOS and Windows can't reach Bluetooth, so the container
+  always uses the fake headset. For a real Muse S Athena, use `./start.sh` or `start.cmd` instead.
+- **Ollama stays on your computer.** By default both containers use the Ollama installed on the host
+  (`./start.sh` sets it up, or get it from [ollama.com](https://ollama.com/download)), because
+  Ollama inside Docker on a Mac can't use the GPU. Without Ollama on the host, run it in Docker too
+  (it downloads the model on first start):
+  ```bash
+  OLLAMA_HOST=http://ollama:11434 docker compose --profile ollama up --build
+  ```
+- `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M docker compose up` picks another model.
+- Both ports listen on this computer only. `docker compose down` stops everything.
+
 ## Tests
 
 ```bash
