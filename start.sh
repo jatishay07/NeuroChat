@@ -41,25 +41,37 @@ if [ ! -f "$stamp" ] || [ pyproject.toml -nt "$stamp" ]; then
 fi
 
 # Local model: install Ollama if it's missing, make sure it's running, download the model once.
+OLLAMA=ollama
 setup_model() {
   if ! command -v ollama >/dev/null; then
-    echo "Installing Ollama (runs the local model)…"
-    if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null; then
-      brew install ollama
+    local app_cli=/Applications/Ollama.app/Contents/Resources/ollama
+    if [ "$(uname)" = "Darwin" ]; then
+      # Ollama's install.sh is Linux-only; on a Mac install the app (which carries the CLI).
+      if [ ! -x "$app_cli" ]; then
+        echo "Installing Ollama (runs the local model)…"
+        local tmp; tmp="$(mktemp -d)"
+        curl -fsSL -o "$tmp/Ollama.zip" https://ollama.com/download/Ollama-darwin.zip
+        ditto -x -k "$tmp/Ollama.zip" /Applications
+        rm -rf "$tmp"
+      fi
+      [ -x "$app_cli" ] || { echo "Ollama didn't install. Get it from https://ollama.com/download" >&2; return 1; }
+      OLLAMA="$app_cli"
+      open -g -a Ollama  # the app runs the Ollama server in the background
     elif [ "$(uname)" = "Linux" ]; then
+      echo "Installing Ollama (runs the local model)…"
       curl -fsSL https://ollama.com/install.sh | sh
     else
       echo "Install Ollama from https://ollama.com/download, then run ./start.sh again." >&2
       return 1
     fi
   fi
-  if ! ollama list >/dev/null 2>&1; then
-    ollama serve >/dev/null 2>&1 &
-    for _ in $(seq 1 30); do ollama list >/dev/null 2>&1 && break; sleep 0.5; done
+  if ! "$OLLAMA" list >/dev/null 2>&1; then
+    "$OLLAMA" serve >/dev/null 2>&1 &
+    for _ in $(seq 1 30); do "$OLLAMA" list >/dev/null 2>&1 && break; sleep 0.5; done
   fi
-  if ! ollama list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
+  if ! "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
     echo "Downloading $MODEL (one time only)…"
-    ollama pull "$MODEL"
+    "$OLLAMA" pull "$MODEL"
   fi
   echo "Local model ready: $MODEL"
 }

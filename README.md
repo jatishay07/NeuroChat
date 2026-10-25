@@ -27,8 +27,8 @@ cd NeuroChat
 ./start.sh              # with a Muse S Athena
 ```
 
-The first run sets up a virtualenv in `.venv`, installs [Ollama](https://ollama.com) (with Homebrew
-on a Mac) and downloads the local model, **Qwen3.5 4B** (a 3.3 GB download, runs on 8 GB of RAM).
+The first run sets up a virtualenv in `.venv`, installs [Ollama](https://ollama.com) (the Mac app,
+or `curl -fsSL https://ollama.com/install.sh | sh` on Linux) and downloads the local model, **Qwen3.5 4B** (a 3.3 GB download, runs on 8 GB of RAM).
 Later runs start straight away. The portal opens in your browser at http://127.0.0.1:8765.
 
 - `./start.sh --skip-model` skips Ollama and the model download.
