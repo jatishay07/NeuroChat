@@ -80,7 +80,7 @@ async function start() {
     return;
   }
   $("startBtn").disabled = true;
-  say("Starting the camera… allow access when your browser asks. The first time, the eye tracker downloads about 5 MB.");
+  say("Starting the camera… allow access when your browser asks. Loading the eye tracker takes a few seconds.");
   try {
     const s = await navigator.mediaDevices.getUserMedia({ video: true });
     s.getTracks().forEach((t) => t.stop()); // just asking for permission; WebEyeTrack opens its own stream
@@ -92,9 +92,13 @@ async function start() {
   $("cam").hidden = false;
   webcam = new WebcamClient("camVideo");
   // We send calibration points ourselves (in screen coordinates), so turn off its own click listener.
-  proxy = new WebEyeTrackProxy(webcam, { autoClick: false, maxCalibPoints: CALIB_POINTS.length + CHECK_POINTS.length });
+  proxy = new WebEyeTrackProxy(webcam, {
+    autoClick: false,
+    maxCalibPoints: CALIB_POINTS.length + CHECK_POINTS.length,
+    mediapipeUrl: new URL("vendor/mediapipe/", location.href).href, // served locally: works offline
+  });
   proxy.onGazeResults = onResult;
-  const timeout = setTimeout(() => say("Still loading the eye tracker… check your internet connection.", true), 30000);
+  const timeout = setTimeout(() => say("Still loading the eye tracker… if this doesn't finish, reload the page.", true), 30000);
   onReady = () => { clearTimeout(timeout); say(""); calibrate(); };
 }
 
