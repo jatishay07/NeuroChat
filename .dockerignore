@@ -2,7 +2,11 @@
 data/
 *.xdf
 .git/
+.github/
 .venv/
+.webui/
+.webui-data/
+.webui_secret_key
 **/__pycache__/
 *.egg-info/
 .pytest_cache/
