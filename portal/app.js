@@ -1,0 +1,101 @@
+// Connect screen: scan for the headset, connect, and show a live per-sensor signal check.
+const $ = (id) => document.getElementById(id);
+const SENSOR_POS = { AF7: [72, 48], AF8: [148, 48], TP9: [54, 140], TP10: [166, 140] };
+const TIPS = {
+  flat: (ch) => `${ch} isn't touching skin. Push the band down a little or move hair out of the way.`,
+  noisy: (ch) => `${ch} is noisy. Sit still, relax your jaw, and check the band isn't loose.`,
+};
+
+let status = null;
+
+async function call(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+function say(text, isError = false) {
+  $("message").textContent = text || "";
+  $("message").classList.toggle("error", isError);
+}
+
+function render(s) {
+  status = s;
+  const busy = s.state === "scanning" || s.state === "connecting";
+  const live = s.state === "streaming" || s.state === "connecting";
+  $("find").hidden = live;
+  $("live").hidden = !live;
+  $("scanBtn").disabled = busy;
+  $("scanBtn").textContent = s.state === "scanning" ? "Looking…" : s.devices.length ? "Look again" : "Find my headset";
+
+  const list = $("devices");
+  list.innerHTML = "";
+  for (const d of s.devices) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span><strong></strong><br><span class="addr"></span></span>`;
+    li.querySelector("strong").textContent = d.name;
+    li.querySelector(".addr").textContent = d.rssi != null ? `${d.address} · signal ${d.rssi} dBm` : d.address;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Connect";
+    btn.disabled = busy;
+    btn.onclick = () => connect(d.address);
+    li.append(btn);
+    list.append(li);
+  }
+
+  $("deviceName").textContent = s.device ? s.device.name : "";
+  $("liveDot").classList.toggle("on", s.state === "streaming");
+  $("rate").textContent = s.state === "connecting" ? "connecting…" : s.srate ? `${Math.round(s.srate)} samples/s` : "";
+
+  const g = $("sensors");
+  g.innerHTML = "";
+  s.channels.forEach((ch, i) => {
+    const [x, y] = SENSOR_POS[ch] || [110, 100];
+    const q = s.quality[i] || "unknown";
+    g.insertAdjacentHTML("beforeend",
+      `<g class="sensor"><circle cx="${x}" cy="${y}" r="13" class="q-${q}"><title>${ch}: ${q}</title></circle>` +
+      `<text x="${x}" y="${ch.startsWith('TP') ? y - 19 : y + 30}" text-anchor="middle">${ch}</text></g>`);
+  });
+  const tips = s.channels.map((ch, i) => TIPS[s.quality[i]]?.(ch)).filter(Boolean);
+  $("tips").innerHTML = tips.map((t) => `<li>${t}</li>`).join("");
+  const allGood = s.state === "streaming" && s.quality.every((q) => q === "good");
+  $("continueBtn").disabled = !allGood;
+
+  if (s.state === "error") say(s.error, true);
+  else if (s.state === "streaming") say(allGood ? "All four sensors look good." : s.quality.includes("unknown") ? "Checking the signal…" : "Adjust the headset until every sensor is green.");
+  else if (s.error) say(s.error);
+  else if (s.state === "idle" && !s.devices.length) say("");
+}
+
+async function scan() {
+  say("Looking for headsets nearby…");
+  try { render(await call("/api/device/scan")); } catch (e) { say(e.message, true); }
+}
+
+async function connect(address) {
+  say("Connecting… this can take up to 20 seconds.");
+  try { render(await call("/api/device/connect", { address })); } catch (e) { say(e.message, true); }
+}
+
+async function disconnect() {
+  try { render(await call("/api/device/disconnect")); } catch (e) { say(e.message, true); }
+}
+
+function listen() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/device`);
+  ws.onmessage = (ev) => render(JSON.parse(ev.data));
+  ws.onclose = () => { say("Lost contact with the companion app. Retrying…", true); setTimeout(listen, 2000); };
+}
+
+$("scanBtn").onclick = scan;
+$("disconnectBtn").onclick = disconnect;
+$("continueBtn").onclick = () => say("Calibration is the next screen to build.");
+listen();
