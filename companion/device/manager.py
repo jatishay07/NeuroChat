@@ -17,7 +17,7 @@ import numpy as np
 from .backends import Backend, BackendError, DeviceInfo
 from .quality import channel_quality
 
-BUFFER_SECONDS = 4
+BUFFER_SECONDS = 60          # long enough to cover one paragraph visit
 QUALITY_SECONDS = 2
 WAVE_SECONDS = 2             # the live waveform on the connect screen
 WAVE_POINTS = 60
@@ -39,6 +39,7 @@ class DeviceManager:
         self.measured_srate: float | None = None
         n = int(BUFFER_SECONDS * backend.srate)
         self._buffer = np.zeros((len(backend.channels), n))
+        self._times = np.zeros(n)   # time.monotonic() each sample arrived, for lining up with gaze
         self._filled = 0
         self._task: asyncio.Task | None = None
         self._subscribers: set[asyncio.Queue] = set()
@@ -161,6 +162,13 @@ class DeviceManager:
         n = min(self._filled, int(seconds * self.backend.srate), self._buffer.shape[1])
         return self._buffer[:, self._buffer.shape[1] - n:]
 
+    def eeg_between(self, t0: float, t1: float) -> np.ndarray:
+        """EEG that arrived between two time.monotonic() times, channels × samples."""
+        start = self._buffer.shape[1] - self._filled
+        times = self._times[start:]
+        keep = (times >= t0) & (times <= t1)
+        return self._buffer[:, start:][:, keep]
+
     def wave(self) -> list[list[float]]:
         """The last few seconds per channel, averaged down to WAVE_POINTS, mean removed, in µV."""
         w = self.window(WAVE_SECONDS)
@@ -213,4 +221,7 @@ class DeviceManager:
         n = min(chunk.shape[1], self._buffer.shape[1])
         self._buffer = np.roll(self._buffer, -n, axis=1)
         self._buffer[:, -n:] = chunk[:, -n:]
+        # A chunk is what arrived since the last poll: spread its samples back from now.
+        self._times = np.roll(self._times, -n)
+        self._times[-n:] = time.monotonic() - np.arange(n - 1, -1, -1) / self.backend.srate
         self._filled = min(self._filled + n, self._buffer.shape[1])
