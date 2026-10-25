@@ -151,12 +151,18 @@ function renderBars() {
   $("bars").innerHTML = "";
   perWord.forEach((v, i) => {
     const slow = median > 0 && sorted.length >= 3 && v > SLOW_FACTOR * median;
+    // Tell the tutor (tutor.js) when a paragraph first turns out to be hard.
+    if (slow && !paras[i].classList.contains("slow")) {
+      window.dispatchEvent(new CustomEvent("paragraph:slow", { detail: { index: i, text: paras[i].textContent.trim() } }));
+    }
     paras[i].classList.toggle("slow", slow);
     const li = document.createElement("li");
     li.className = slow ? "slow" : "";
     li.innerHTML = `<span class="label">¶${i + 1}</span><span class="track"><span class="fill"></span></span><span class="val"></span>`;
     li.querySelector(".fill").style.width = `${(100 * v) / max}%`;
     li.querySelector(".val").textContent = `${v.toFixed(1)} s${slow ? " · slow here" : ""}`;
+    li.title = "Click to have the tutor explain this paragraph";
+    li.onclick = () => window.dispatchEvent(new CustomEvent("paragraph:explain", { detail: { index: i, text: paras[i].textContent.trim() } }));
     li.onmouseenter = () => paras[i].classList.add("hover");
     li.onmouseleave = () => paras[i].classList.remove("hover");
     $("bars").append(li);

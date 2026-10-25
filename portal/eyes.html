@@ -6,6 +6,7 @@
   <title>NeuroChat · Eye tracking</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="tutor.css">
 </head>
 <body class="eyes">
   <header class="top">
@@ -45,7 +46,7 @@
     </article>
     <aside class="panel">
       <h2>Where your eyes went</h2>
-      <p class="muted small">Time spent on each paragraph, per 100 words. Paragraphs you were much slower on than the rest are marked: that's where the tutor would offer to explain.</p>
+      <p class="muted small">Time spent on each paragraph, per 100 words. Paragraphs you were much slower on are marked, and the tutor offers to explain them. Click any row to ask about that paragraph.</p>
       <ol id="bars" class="bars"></ol>
       <p class="accuracy small" id="accuracy"></p>
       <div class="row">
@@ -54,11 +55,28 @@
         <button id="resetBtn" type="button" class="quiet">Reset times</button>
         <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
       </div>
+      <section id="tutor" class="tutor" aria-live="polite">
+        <h2>Tutor</h2>
+        <p id="tutorStatus" class="muted small"></p>
+        <div id="offer" class="offer" hidden>
+          <p id="offerText"></p>
+          <div class="row">
+            <button id="offerYes" type="button" class="primary">Explain it</button>
+            <button id="offerNo" type="button" class="quiet">Not now</button>
+          </div>
+        </div>
+        <div id="chat" class="chat"></div>
+        <form id="askForm" class="ask" hidden>
+          <input id="askInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" aria-label="Ask the tutor a follow-up question">
+          <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
+        </form>
+      </section>
     </aside>
   </div>
 
   <!-- WebGazer (GPL-3.0) is loaded from a CDN at runtime rather than bundled into this repo. -->
   <script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
   <script src="eyes.js"></script>
+  <script src="tutor.js"></script>
 </body>
 </html>
