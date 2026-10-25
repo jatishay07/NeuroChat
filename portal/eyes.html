@@ -8,9 +8,12 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="eyes">
+  <header class="top">
+    <span class="brand">NeuroChat</span>
+    <span class="steps" role="img" aria-label="Step 2 of 3"><i class="on"></i><i class="on"></i><i></i></span>
+  </header>
   <!-- 1. Start the camera -->
   <main class="card" id="intro">
-    <p class="eyebrow">Step 2 of 3</p>
     <h1>Calibrate eye tracking</h1>
     <p class="lede">Your webcam works out where on the screen you're looking. Nothing is recorded or sent anywhere: the video stays in this browser tab.</p>
     <ul class="tips">
@@ -46,10 +49,10 @@
       <ol id="bars" class="bars"></ol>
       <p class="accuracy small" id="accuracy"></p>
       <div class="row">
-        <button id="dotBtn" type="button">Hide gaze dot</button>
-        <button id="camBtn" type="button">Hide camera</button>
-        <button id="resetBtn" type="button">Reset times</button>
-        <button id="recalBtn" type="button">Recalibrate</button>
+        <button id="dotBtn" type="button" class="quiet">Hide gaze dot</button>
+        <button id="camBtn" type="button" class="quiet">Hide camera</button>
+        <button id="resetBtn" type="button" class="quiet">Reset times</button>
+        <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
       </div>
     </aside>
   </div>

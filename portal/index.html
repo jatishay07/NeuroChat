@@ -8,10 +8,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <header class="top">
+    <span class="brand">NeuroChat</span>
+    <span class="steps" role="img" aria-label="Step 1 of 3"><i class="on"></i><i></i><i></i></span>
+  </header>
   <main class="card">
-    <p class="eyebrow">Step 1 of 3</p>
     <h1>Connect your headset</h1>
-    <p class="lede">Turn on your Muse S Athena, put it on, and keep it near this computer. Close the Muse app first, since the headset can only talk to one app at a time.</p>
+    <p class="lede">Turn on your Muse S Athena and put it on. Close the Muse app first: the headset talks to one app at a time.</p>
 
     <section id="find">
       <button id="scanBtn" type="button" class="primary">Find my headset</button>
@@ -20,23 +23,19 @@
     </section>
 
     <section id="live" hidden>
+      <svg id="head" viewBox="0 0 220 200" role="img" aria-label="Top view of a head showing the four sensors. Green means a sensor is reading cleanly.">
+        <ellipse cx="110" cy="105" rx="78" ry="88" class="skull"/>
+        <path d="M100 18 L110 6 L120 18" class="nose"/>
+        <g id="sensors"></g>
+      </svg>
+      <ul id="tips" class="tips"></ul>
+      <button id="continueBtn" type="button" class="primary" disabled>Continue</button>
       <div class="connected">
         <span class="dot" id="liveDot"></span>
         <span id="deviceName"></span>
         <span class="muted" id="rate"></span>
-        <button id="disconnectBtn" type="button">Disconnect</button>
+        <button id="disconnectBtn" type="button" class="quiet">Disconnect</button>
       </div>
-      <h2>Sensor check</h2>
-      <p class="muted">Each sensor needs to touch skin. Green means it's reading cleanly.</p>
-      <svg id="head" viewBox="0 0 220 200" role="img" aria-label="Top view of a head showing the four sensors">
-        <ellipse cx="110" cy="105" rx="78" ry="88" class="skull"/>
-        <path d="M100 18 L110 6 L120 18" class="nose"/>
-        <ellipse cx="28" cy="110" rx="9" ry="20" class="ear"/>
-        <ellipse cx="192" cy="110" rx="9" ry="20" class="ear"/>
-        <g id="sensors"></g>
-      </svg>
-      <ul id="tips" class="tips"></ul>
-      <button id="continueBtn" type="button" class="primary" disabled>Continue to calibration</button>
     </section>
 
     <p id="message" class="message" role="status"></p>
