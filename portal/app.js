@@ -7,6 +7,7 @@ const TIPS = {
 };
 
 let status = null;
+let readingTab = false; // reading opened in a new tab while this one holds the headset
 let bt = null; // the Web Bluetooth session, when the browser connected the headset itself
 const webBluetooth = !!window.MuseBluetooth?.supported();
 
@@ -75,6 +76,7 @@ function render(s) {
   $("continueBtn").disabled = !allGood;
 
   if (s.state === "error") say(s.error, true);
+  else if (s.state === "streaming" && readingTab) say("Reading is open in another tab. Keep this tab open: it holds the headset connection.");
   else if (s.state === "streaming") say(allGood ? "All four sensors look good." : s.quality.includes("unknown") ? "Checking the signal…" : "Adjust the headset until every sensor is green.");
   else if (s.error) say(s.error);
   else if (s.state === "idle" && !s.devices.length) say("");
@@ -91,7 +93,7 @@ async function findHeadset() {
 async function connectBluetooth() {
   say("Pick your Muse in the list your browser shows.");
   bt?.stop();
-  bt = new MuseBluetooth((message) => { bt = null; if (message) say(message, true); });
+  bt = new MuseBluetooth((message) => { bt = null; readingTab = false; if (message) say(message, true); });
   try {
     await bt.connect();
   } catch (e) {
@@ -127,5 +129,13 @@ $("scanBtn").onclick = findHeadset;
 $("simBtn").onclick = (e) => { e.preventDefault(); scan(); };
 $("nativeBtn").onclick = (e) => { e.preventDefault(); scan(); };
 $("disconnectBtn").onclick = disconnect;
-$("continueBtn").onclick = () => { location.href = "/eyes.html"; };
+$("continueBtn").onclick = () => {
+  if (!bt) { location.href = "/eyes.html"; return; }
+  // The browser's Bluetooth link lives in this page, so reading opens in a new tab and this one stays.
+  window.open("/eyes.html", "_blank");
+  readingTab = true;
+  render(status);
+};
+// Leaving this page would drop a headset the browser connected.
+window.addEventListener("beforeunload", (e) => { if (bt) e.preventDefault(); });
 listen();

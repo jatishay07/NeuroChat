@@ -86,3 +86,20 @@ def test_subscribers_get_status_updates():
             states.append((await q.get())["state"])
         assert states[:2] == ["scanning", "idle"]
     run(go())
+
+
+def test_eeg_between_returns_samples_from_a_time_span():
+    async def go():
+        import time
+        m = DeviceManager(SimulatedBackend())
+        await m.scan(timeout=0.1)
+        await m.connect("SIM-0001")
+        await wait_for(lambda: m.state == "streaming")
+        t0 = time.monotonic()
+        await asyncio.sleep(1.0)
+        t1 = time.monotonic()
+        span = m.eeg_between(t0, t1)
+        assert span.shape[0] == 4 and 128 < span.shape[1] < 384  # about 1 s at 256 Hz
+        assert m.eeg_between(t1 + 10, t1 + 20).shape[1] == 0
+        await m.disconnect()
+    run(go())
