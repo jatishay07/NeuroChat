@@ -10,7 +10,7 @@ Everything runs on your own computer:
 | Piece | Folder | Status |
 |---|---|---|
 | Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection done; model downloads with `start.sh`, chat not wired yet |
-| Portal: connect screen, then the chat | `portal/` | Connect screen done |
+| Portal: connect screen, eye tracking, then the chat | `portal/` | Connect screen and eye-tracking test done |
 | Browser extension: paragraphs and webcam gaze on any page | `extension/` | Next |
 
 Build plan: [Struggle-Aware Tutor Build Plan](https://claude.ai/artifact/B7heEKCnARoA9t1QNRfA4D).
@@ -60,7 +60,10 @@ python -m companion --simulate     # or: python -m companion
 ```
 </details>
 
-Click **Find my headset**, and connect.
+Click **Find my headset**, and connect. No headset with you? Click **Skip to eye tracking**: it
+calibrates [WebGazer](https://webgazer.cs.brown.edu) on your webcam (video never leaves the browser)
+and shows how long you spend on each paragraph of a test passage. WebGazer is GPL-3.0 and is
+loaded from a CDN at runtime, not bundled here.
 
 With a real headset, close the Muse app first (the headset talks to one app at a time).
 The companion scans over Bluetooth LE with [bleak](https://github.com/hbldh/bleak), starts

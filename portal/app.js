@@ -97,5 +97,5 @@ function listen() {
 
 $("scanBtn").onclick = scan;
 $("disconnectBtn").onclick = disconnect;
-$("continueBtn").onclick = () => say("Calibration is the next screen to build.");
+$("continueBtn").onclick = () => { location.href = "/eyes.html"; };
 listen();
