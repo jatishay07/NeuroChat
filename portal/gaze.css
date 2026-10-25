@@ -1,0 +1,10 @@
+/* Camera preview and gaze dot for eye tracking. Uses the glass tokens from style.css. */
+.cam { position: fixed; right: 16px; bottom: 16px; z-index: 30; width: 200px; border-radius: 20px; overflow: hidden; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: 0 20px 50px rgba(20, 30, 60, .15); }
+.cam video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transform: scaleX(-1); background: #111; }
+.cam.collapsed video { display: none; }
+.chip { display: block; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.chip.ok { color: var(--good); }
+.chip.bad { color: var(--bad); }
+.gaze-dot { position: fixed; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; z-index: 40; pointer-events: none; background: rgba(229, 138, 0, .55); border: 2px solid rgba(255, 255, 255, .9); box-shadow: 0 0 0 1px rgba(11, 13, 18, .15); transition: transform 60ms linear; }
+/* While calibrating, keep the preview clear of the dots (corners and edge midpoints). */
+body.calibrating .cam { right: auto; bottom: auto; left: 50%; top: 74%; transform: translate(-50%, -50%); width: 180px; }
