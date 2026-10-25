@@ -39,8 +39,8 @@ The first run takes a few minutes. It:
 
 1. uses Python 3.11+ if you have it, or downloads one with [uv](https://docs.astral.sh/uv/) (no admin rights needed);
 2. sets up a virtualenv in `.venv` and installs the companion app;
-3. installs [Ollama](https://ollama.com) if it's missing (the Mac app, the Windows installer, or
-   `curl -fsSL https://ollama.com/install.sh | sh` on Linux);
+3. installs [Ollama](https://ollama.com) if it's missing, or updates it if it's too old for the model
+   (`curl -fsSL https://ollama.com/install.sh | sh` on macOS and Linux, the installer on Windows);
 4. downloads the local model, **Qwen3.5 4B** (3.3 GB, runs on 8 GB of RAM).
 
 It also installs a **`neurochat` command**. From then on, open any terminal and type:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 import uvicorn
 
@@ -17,7 +18,11 @@ def main() -> None:
     args = parser.parse_args()
     backend = SimulatedBackend(bad_channel=args.bad_channel) if args.simulate else MuseBackend()
     print(f"Portal: http://127.0.0.1:{args.port}")
-    uvicorn.run(create_app(backend), host="127.0.0.1", port=args.port, log_level="warning")
+    # Short graceful shutdown: the portal keeps a WebSocket open, which would otherwise make Ctrl+C
+    # hang. Closing that socket on the way out is expected, so don't log it as an error.
+    logging.getLogger("uvicorn.error").addFilter(
+        lambda r: "timeout graceful shutdown exceeded" not in r.getMessage())
+    uvicorn.run(create_app(backend), host="127.0.0.1", port=args.port, log_level="warning", timeout_graceful_shutdown=1)
 
 
 if __name__ == "__main__":

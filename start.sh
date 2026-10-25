@@ -76,38 +76,73 @@ fi
 
 # Local model: install Ollama if it's missing, make sure it's running, download the model once.
 OLLAMA=ollama
-setup_model() {
-  if ! command -v ollama >/dev/null; then
-    local app_cli=/Applications/Ollama.app/Contents/Resources/ollama
-    if [ "$(uname)" = "Darwin" ]; then
-      # Ollama's install.sh is Linux-only; on a Mac install the app (which carries the CLI).
-      if [ ! -x "$app_cli" ]; then
-        echo "Installing Ollama (runs the local model)…"
-        local tmp; tmp="$(mktemp -d)"
-        curl -fsSL -o "$tmp/Ollama.zip" https://ollama.com/download/Ollama-darwin.zip
-        ditto -x -k "$tmp/Ollama.zip" /Applications
-        rm -rf "$tmp"
-      fi
-      [ -x "$app_cli" ] || { echo "Ollama didn't install. Get it from https://ollama.com/download" >&2; return 1; }
-      OLLAMA="$app_cli"
-      open -g -a Ollama  # the app runs the Ollama server in the background
-    elif [ "$(uname)" = "Linux" ]; then
-      echo "Installing Ollama (runs the local model)…"
-      curl -fsSL https://ollama.com/install.sh | sh
+ollama_version() { "$1" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1; }
+server_version() { curl -fsS --max-time 2 http://127.0.0.1:11434/api/version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'; }
+older() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$1" ]; }
+
+install_ollama() {
+  echo "Installing the latest Ollama (runs the local model; may ask for your password)…"
+  case "$(uname)" in
+    Darwin|Linux) curl -fsSL https://ollama.com/install.sh | sh ;;
+    *) echo "Install Ollama from https://ollama.com/download, then run neurochat again." >&2; return 1 ;;
+  esac
+}
+
+# Several Ollamas can be installed (Homebrew, the Mac app, an old download). Use the newest.
+pick_ollama() {
+  local best="" bestv="" c v
+  for c in $(type -ap ollama) /Applications/Ollama.app/Contents/Resources/ollama /usr/local/bin/ollama; do
+    [ -x "$c" ] || continue
+    v="$(ollama_version "$c")"; [ -n "$v" ] || continue
+    if [ -z "$bestv" ] || older "$bestv" "$v"; then best="$c"; bestv="$v"; fi
+  done
+  [ -n "$best" ] && OLLAMA="$best"
+}
+
+# Make sure the Ollama server that's running is the newest one we have, and start it if needed.
+start_ollama() {
+  local want have
+  want="$(ollama_version "$OLLAMA")"
+  have="$(server_version || true)"
+  if [ -n "$have" ] && older "$have" "$want"; then
+    echo "Restarting Ollama ($have is running, $want is installed)…"
+    [ "$(uname)" = "Darwin" ] && osascript -e 'quit app "Ollama"' >/dev/null 2>&1 || true
+    command -v brew >/dev/null && brew services stop ollama >/dev/null 2>&1 || true
+    pkill -f "ollama serve" >/dev/null 2>&1 || true
+    sleep 2
+    have=""
+  fi
+  if [ -z "$(server_version || true)" ]; then
+    if [ "$(uname)" = "Darwin" ] && [ -d /Applications/Ollama.app ] && [[ "$OLLAMA" == /Applications/* || "$OLLAMA" == /usr/local/bin/* ]]; then
+      open -g -a Ollama
     else
-      echo "Install Ollama from https://ollama.com/download, then run ./start.sh again." >&2
-      return 1
+      "$OLLAMA" serve >/dev/null 2>&1 &
     fi
+    for _ in $(seq 1 40); do [ -n "$(server_version || true)" ] && break; sleep 0.5; done
   fi
-  if ! "$OLLAMA" list >/dev/null 2>&1; then
-    "$OLLAMA" serve >/dev/null 2>&1 &
-    for _ in $(seq 1 30); do "$OLLAMA" list >/dev/null 2>&1 && break; sleep 0.5; done
+  [ -n "$(server_version || true)" ] || { echo "Ollama didn't start." >&2; return 1; }
+}
+
+setup_model() {
+  pick_ollama
+  if ! command -v "$OLLAMA" >/dev/null; then install_ollama && pick_ollama || return 1; fi
+  start_ollama || return 1
+  if "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
+    echo "Local model ready: $MODEL"; return 0
   fi
-  if ! "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
-    echo "Downloading $MODEL (one time only)…"
-    "$OLLAMA" pull "$MODEL"
+  echo "Downloading $MODEL (one time only)…"
+  local log; log="$(mktemp)"
+  if ! "$OLLAMA" pull "$MODEL" 2>&1 | tee "$log"; then :; fi
+  if grep -q "newer version of Ollama" "$log"; then
+    # The model needs a newer Ollama than the one installed: update it and try once more.
+    install_ollama && pick_ollama && start_ollama && "$OLLAMA" pull "$MODEL"
   fi
-  echo "Local model ready: $MODEL"
+  rm -f "$log"
+  if "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
+    echo "Local model ready: $MODEL"
+  else
+    echo "Couldn't download $MODEL. If it says Ollama is too old, update it from https://ollama.com/download and run neurochat again." >&2; return 1
+  fi
 }
 if [ "$skip_model" = 0 ]; then
   setup_model || echo "Carrying on without the local model; the headset screens still work." >&2
