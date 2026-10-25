@@ -34,3 +34,16 @@ def test_portal_is_served():
         assert r.status_code == 200 and "Connect your headset" in r.text
         r = client.get("/eyes.html")
         assert r.status_code == 200 and "Calibrate eye tracking" in r.text
+
+
+def test_streaming_status_carries_a_live_waveform():
+    with TestClient(create_app(SimulatedBackend())) as client:
+        client.post("/api/device/scan", params={"timeout": 1})
+        assert client.get("/api/device").json()["wave"] is None
+        with client.websocket_connect("/ws/device") as ws:
+            client.post("/api/device/connect", json={"address": "SIM-0001"})
+            deadline, wave = time.time() + 5, None
+            while time.time() < deadline and not (wave and len(wave[0]) == 60):
+                wave = ws.receive_json()["wave"]
+        assert len(wave) == 4 and all(len(ch) == 60 for ch in wave)
+        assert all(abs(sum(ch) / 60) < 1 for ch in wave)  # centred on 0
