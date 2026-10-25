@@ -15,6 +15,7 @@ let tracking = false;
 let current = -1, candidate = null, lastT = null; // paragraph being read, one it may be moving to
 let recent = []; // last few gaze points, for smoothing
 let dwell = []; // ms per paragraph
+let rereads = [], furthest = -1; // times the eyes came back to a paragraph after reading past it
 let paras = [];
 let webcam = null, proxy = null;
 let face = false; // is a face with open eyes in view right now?
@@ -196,6 +197,8 @@ function read() {
 
 function reset() {
   dwell = paras.map(() => 0);
+  rereads = paras.map(() => 0);
+  furthest = -1;
   current = -1;
   candidate = null;
   lastT = null;
@@ -232,10 +235,18 @@ function onGaze(g) {
   else if (g.t - candidate.since >= SWITCH_MS) {
     if (current >= 0) dwell[current] -= g.t - candidate.since;
     if (i >= 0) dwell[i] += g.t - candidate.since;
+    if (i >= 0 && i < furthest) rereads[i]++;
+    furthest = Math.max(furthest, i);
     current = i;
     candidate = null;
     paras.forEach((p, j) => p.classList.toggle("gazed", j === i));
   }
+}
+
+// What the tutor gets about a paragraph: index and text, plus how it was read.
+function paragraphDetail(i) {
+  const dwellMsPer100Words = Math.round((dwell[i] / wordCount(paras[i])) * 100);
+  return { index: i, text: paras[i].textContent.trim(), dwellMsPer100Words, rereads: rereads[i] };
 }
 
 function wordCount(p) {
@@ -252,7 +263,7 @@ function renderBars() {
     const slow = median > 0 && sorted.length >= 3 && v > SLOW_FACTOR * median;
     // Tell the tutor (tutor.js) when a paragraph first turns out to be hard.
     if (slow && !paras[i].classList.contains("slow")) {
-      window.dispatchEvent(new CustomEvent("paragraph:slow", { detail: { index: i, text: paras[i].textContent.trim() } }));
+      window.dispatchEvent(new CustomEvent("paragraph:slow", { detail: paragraphDetail(i) }));
     }
     paras[i].classList.toggle("slow", slow);
     const li = document.createElement("li");
@@ -261,7 +272,7 @@ function renderBars() {
     li.querySelector(".fill").style.width = `${(100 * v) / max}%`;
     li.querySelector(".val").textContent = `${v.toFixed(1)} s${slow ? " · slow here" : ""}`;
     li.title = "Click to have the tutor explain this paragraph";
-    li.onclick = () => window.dispatchEvent(new CustomEvent("paragraph:explain", { detail: { index: i, text: paras[i].textContent.trim() } }));
+    li.onclick = () => window.dispatchEvent(new CustomEvent("paragraph:explain", { detail: paragraphDetail(i) }));
     li.onmouseenter = () => paras[i].classList.add("hover");
     li.onmouseleave = () => paras[i].classList.remove("hover");
     $("bars").append(li);
