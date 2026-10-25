@@ -7,6 +7,7 @@ const TIPS = {
 };
 
 let status = null;
+let readingTab = false; // reading opened in a new tab while this one holds the headset
 let bt = null; // the Web Bluetooth session, when the browser connected the headset itself
 const webBluetooth = !!window.MuseBluetooth?.supported();
 
@@ -69,12 +70,14 @@ function render(s) {
       `<g class="sensor"><circle cx="${x}" cy="${y}" r="13" class="q-${q}"><title>${ch}: ${q}</title></circle>` +
       `<text x="${x}" y="${ch.startsWith('TP') ? y - 19 : y + 30}" text-anchor="middle">${ch}</text></g>`);
   });
+  renderWaves(s);
   const tips = s.channels.map((ch, i) => TIPS[s.quality[i]]?.(ch)).filter(Boolean);
   $("tips").innerHTML = tips.map((t) => `<li>${t}</li>`).join("");
   const allGood = s.state === "streaming" && s.quality.every((q) => q === "good");
   $("continueBtn").disabled = !allGood;
 
   if (s.state === "error") say(s.error, true);
+  else if (s.state === "streaming" && readingTab) say("Reading is open in another tab. Keep this tab open: it holds the headset connection.");
   else if (s.state === "streaming") say(allGood ? "All four sensors look good." : s.quality.includes("unknown") ? "Checking the signal…" : "Adjust the headset until every sensor is green.");
   else if (s.error) say(s.error);
   else if (s.state === "idle" && !s.devices.length) say("");
@@ -91,7 +94,7 @@ async function findHeadset() {
 async function connectBluetooth() {
   say("Pick your Muse in the list your browser shows.");
   bt?.stop();
-  bt = new MuseBluetooth((message) => { bt = null; if (message) say(message, true); });
+  bt = new MuseBluetooth((message) => { bt = null; readingTab = false; if (message) say(message, true); });
   try {
     await bt.connect();
   } catch (e) {
@@ -99,6 +102,26 @@ async function connectBluetooth() {
     // Closing the browser's list isn't an error.
     say(/cancel/i.test(e.message) ? "" : e.message || String(e), !/cancel/i.test(e.message));
   }
+}
+
+// Live waveforms under the head: the last 2 s per channel, centred on 0 µV, drawn at a fixed scale
+// so a noisy or loose sensor visibly jumps around.
+const WAVE_UV = 100; // ±µV that fills the row
+function renderWaves(s) {
+  const box = $("waves");
+  box.hidden = !s.wave;
+  if (!s.wave) return;
+  box.innerHTML = "";
+  s.channels.forEach((ch, i) => {
+    const w = s.wave[i] || [];
+    const q = s.quality[i] || "unknown";
+    const pts = w.map((v, j) => `${(j / Math.max(1, w.length - 1)) * 300},${11 - Math.max(-1, Math.min(1, v / WAVE_UV)) * 10}`).join(" ");
+    const row = document.createElement("div");
+    row.className = `wave q-${q}`;
+    row.innerHTML = `<span></span><svg viewBox="0 0 300 22" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+    row.querySelector("span").textContent = ch;
+    box.append(row);
+  });
 }
 
 async function scan() {
@@ -127,5 +150,13 @@ $("scanBtn").onclick = findHeadset;
 $("simBtn").onclick = (e) => { e.preventDefault(); scan(); };
 $("nativeBtn").onclick = (e) => { e.preventDefault(); scan(); };
 $("disconnectBtn").onclick = disconnect;
-$("continueBtn").onclick = () => { location.href = "/eyes.html"; };
+$("continueBtn").onclick = () => {
+  if (!bt) { location.href = "/eyes.html"; return; }
+  // The browser's Bluetooth link lives in this page, so reading opens in a new tab and this one stays.
+  window.open("/eyes.html", "_blank");
+  readingTab = true;
+  render(status);
+};
+// Leaving this page would drop a headset the browser connected.
+window.addEventListener("beforeunload", (e) => { if (bt) e.preventDefault(); });
 listen();

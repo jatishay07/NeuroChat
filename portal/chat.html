@@ -7,31 +7,34 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="tutor.css">
+  <link rel="stylesheet" href="chat.css">
 </head>
-<body>
-  <!-- The tutor without the headset or eye tracking. /chat opens Open WebUI instead when it's running. -->
+<body class="chat-page">
+  <!-- The tutor without the headset or eye tracking (/chat). Open WebUI is one click away via "Continue in Open WebUI". -->
   <header class="top">
     <span class="brand">NeuroChat</span>
+    <a class="small" href="/">Connect the headset</a>
   </header>
-  <main class="card chat-card">
-    <h1>Ask the tutor</h1>
-    <p class="lede">Paste a passage you're stuck on or ask a question. The answer comes from the model on this computer.</p>
-    <section id="tutor" class="tutor" aria-live="polite">
-      <p id="tutorStatus" class="muted small"></p>
-      <div id="offer" class="offer" hidden>
-        <p id="offerText"></p>
-        <div class="row">
-          <button id="offerYes" type="button" class="primary">Explain it</button>
-          <button id="offerNo" type="button" class="quiet">Not now</button>
-        </div>
+  <main id="tutor" class="tutor chat-col" aria-live="polite">
+    <div class="chat-empty">
+      <h1>Ask the tutor</h1>
+      <p class="lede">Paste a passage you're stuck on, or ask anything. The answer comes from the model on this computer.</p>
+    </div>
+    <div id="offer" class="offer" hidden>
+      <p id="offerText"></p>
+      <div class="row">
+        <button id="offerYes" type="button" class="primary">Explain it</button>
+        <button id="offerNo" type="button" class="quiet">Not now</button>
       </div>
-      <div id="chat" class="chat"></div>
+    </div>
+    <div id="chat" class="chat"></div>
+    <div class="composer">
       <form id="askForm" class="ask">
         <input id="askInput" type="text" placeholder="Ask anything…" autocomplete="off" aria-label="Ask the tutor">
         <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
       </form>
-    </section>
-    <p class="skip muted"><a href="/">Connect the headset</a> · <a href="/eyes.html">Eye tracking</a></p>
+      <p id="tutorStatus" class="muted small"></p>
+    </div>
   </main>
   <script src="tutor.js"></script>
 </body>

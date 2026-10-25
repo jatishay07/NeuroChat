@@ -30,6 +30,7 @@
     constructor(onEnd) {
       this.onEnd = onEnd; // called once with an error message, or null after stop()
       this.queue = [];
+      this.lastSent = 0;
       this.ended = false;
     }
 
@@ -56,11 +57,15 @@
         this.ws.onclose = () => this.end(null);
         this.ws.send(JSON.stringify({ type: "hello", name: this.device.name || "Muse" }));
         for (const c of data) {
-          c.addEventListener("characteristicvaluechanged", (e) => this.queue.push([c.uuid, hex(e.target.value)]));
+          c.addEventListener("characteristicvaluechanged", (e) => {
+            this.queue.push([c.uuid, hex(e.target.value)]);
+            // Send from the event itself: Chrome slows timers in background tabs, not Bluetooth events.
+            if (performance.now() - this.lastSent >= 100) this.flush();
+          });
           await c.startNotifications();
         }
         await this.control.startNotifications().catch(() => {});
-        this.timer = setInterval(() => this.flush(), 100);
+        this.timer = setInterval(() => this.flush(), 250); // catches the tail of a burst
         await this.start();
       } catch (e) {
         this.end(null);
@@ -88,6 +93,7 @@
       if (!this.queue.length || this.ws?.readyState !== WebSocket.OPEN) return;
       this.ws.send(JSON.stringify({ type: "data", packets: this.queue }));
       this.queue = [];
+      this.lastSent = performance.now();
     }
 
     stop() { this.end(null); }
