@@ -25,6 +25,23 @@ let margin = 60; // how far (px) above or below a paragraph a gaze point may lan
 let frames = 0, fps = 0;
 let onReady = null;
 
+// Paragraph visits go live to the companion over /ws/gaze, which lines each one up with the EEG
+// recorded during it (gaze says where, the headset says whether you were engaged there).
+let gazeWs = null, sentParagraph = null;
+function sendGaze(msg) {
+  if (!gazeWs || gazeWs.readyState > WebSocket.OPEN) {
+    gazeWs = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/gaze`);
+    gazeWs.onclose = () => { gazeWs = null; sentParagraph = null; };
+  }
+  if (gazeWs.readyState === WebSocket.OPEN) gazeWs.send(JSON.stringify(msg));
+  else gazeWs.addEventListener("open", () => gazeWs && gazeWs.send(JSON.stringify(msg)), { once: true });
+}
+function gazeOn(i) { // i = paragraph index, or -1 when the eyes are off the text
+  if (i === sentParagraph) return;
+  sentParagraph = i;
+  sendGaze(i >= 0 ? { type: "enter", paragraph: i } : { type: "leave" });
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The tracker works in screen coordinates (-0.5 to 0.5, centre 0), so moving or resizing the window
@@ -64,7 +81,7 @@ function onResult(r) {
   const found = r.facialLandmarks && r.facialLandmarks.length > 0;
   setFace(found, r.gazeState === "open");
   if (onReady) { onReady(); onReady = null; }
-  if (!face) { $("gazeDot").hidden = true; return; }
+  if (!face) { $("gazeDot").hidden = true; if (tracking) offText(); return; }
   const { x, y } = fromScreen(r.normPog);
   latest = { x, y, t: performance.now() };
   if (collect) collect.push(latest);
@@ -109,6 +126,7 @@ addEventListener("pointerdown", (e) => {
 
 async function calibrate() {
   tracking = false;
+  if (sentParagraph != null) gazeOn(-1);
   proxy.resetCalibration();
   document.body.classList.remove("reading");
   document.body.classList.add("calibrating");
@@ -207,6 +225,7 @@ function reset() {
   candidate = null;
   lastT = null;
   recent = [];
+  if (sentParagraph != null) { sentParagraph = null; sendGaze({ type: "reset" }); }
   renderBars();
 }
 
@@ -222,6 +241,15 @@ function paragraphAt(x, y) {
   return best;
 }
 
+// Face lost, tab hidden or a long gap: the current visit ends; reading resumes once the gaze settles again.
+function offText() {
+  current = -1;
+  candidate = null;
+  gazeOn(-1);
+  paras.forEach((p) => p.classList.remove("gazed"));
+}
+document.addEventListener("visibilitychange", () => document.hidden && tracking && offText());
+
 const median = (v) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)];
 
 function onGaze(g) {
@@ -231,7 +259,7 @@ function onGaze(g) {
   const i = paragraphAt(median(recent.map((p) => p.x)), median(recent.map((p) => p.y)));
   const gap = lastT == null ? 0 : g.t - lastT;
   lastT = g.t;
-  if (gap > MAX_GAP_MS) { candidate = null; return; }
+  if (gap > MAX_GAP_MS) { offText(); return; }
   if (current >= 0) dwell[current] += gap;
   // Only move to another paragraph once the gaze has stayed there a moment; that time then counts for it.
   if (i === current) candidate = null;
@@ -242,6 +270,7 @@ function onGaze(g) {
     if (i >= 0 && i < furthest) rereads[i]++;
     furthest = Math.max(furthest, i);
     current = i;
+    gazeOn(i);
     candidate = null;
     paras.forEach((p, j) => p.classList.toggle("gazed", j === i));
   }
