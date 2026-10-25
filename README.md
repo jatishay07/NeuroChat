@@ -122,8 +122,11 @@ From a clone, `docker compose up` does the same (`docker compose up --build` bui
 - **Headset: use Chrome or Edge.** Docker can't reach Bluetooth, so the browser connects the
   Muse S Athena and passes its data to the container (see above). In other browsers the page offers a
   simulated headset instead.
-- **Speed.** On a Mac, Ollama inside Docker runs on the CPU (Docker can't use Apple's GPU), so answers
-  are slower than with `./start.sh`. With an NVIDIA GPU on Linux or Windows, add `--gpus all`.
+- **Speed.** Ollama inside Docker can't use a Mac's GPU, so on a Mac it's slow. If the
+  [Ollama app](https://ollama.com/download) is running on your computer and has the model (`ollama pull qwen3.5:4b`,
+  or run `./start.sh` once), the container uses that one instead and answers come at full speed; the
+  logs say which it picked. `-e NEUROCHAT_OLLAMA=bundled` or `=host` forces one. With an NVIDIA GPU on
+  Linux or Windows, add `--gpus all` to use the one inside.
 - Both ports listen on this computer only. The image is rebuilt and published from `main` by
   `.github/workflows/docker.yml`; `docker build --build-arg MODEL=qwen3.5:2b-q4_K_M .` bakes in another model.
 

@@ -6,6 +6,8 @@ services:
     image: ghcr.io/jatishay07/neurochat:latest
     build: .
     init: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # to find an Ollama running on this computer (Linux)
     ports:
       - "127.0.0.1:8765:8765"
       - "127.0.0.1:3000:3000"
