@@ -26,6 +26,13 @@
     };
   }
 
+  // The readable text of the page, for "Summarize this page" and questions about it.
+  function pageText() {
+    const main = document.querySelector("article, main, [role=main]") || document.body;
+    const text = (main.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+    return { title: document.title, url: location.href, text: text.slice(0, 12000) };
+  }
+
   // The floating button, in a shadow root so the page's styles can't reach it.
   const host = document.createElement("neurochat-pill");
   const root = host.attachShadow({ mode: "closed" });
@@ -113,5 +120,6 @@
 
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (msg.type === "neurochat:selection") reply(selection());
+    if (msg.type === "neurochat:page") reply(pageText());
   });
 })();

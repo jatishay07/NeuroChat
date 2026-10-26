@@ -22,16 +22,24 @@ on the NeuroChat card in `chrome://extensions`.
 - Or press **Alt+Shift+E** (change it at `chrome://extensions/shortcuts`).
 - Click the toolbar icon to open the chat and ask anything.
 
-Each explanation starts a new conversation. It includes the paragraph around your selection, so a
-short phrase isn't explained without its context. **New chat** clears it.
+**Each page has its own conversation.** Explanations and questions on a page carry on in the same
+chat. Switch tabs and the chat switches with you. Come back to the page later, even after closing
+the panel or restarting Chrome, and the conversation is still there. The last 60 pages are kept in
+the extension's storage on this computer. **+** starts over on the current page.
+
+An explanation includes the paragraph around your selection, so a short phrase isn't explained
+without its context. Your first question on a page takes the page's text along, so you can ask
+"what does this mean?" straight away. The suggestions (**Summarize this page**, **Explain the main
+idea simply**, **Quiz me on it**) work the same way.
 
 ## How it works
 
 | File | Job |
 |---|---|
-| `content.js` | On every page: the Explain button, and the selection plus its paragraph |
+| `content.js` | On every page: the Explain button, the selection plus its paragraph, and the page's text |
 | `background.js` | Opens the side panel and hands it the request (right-click menu, shortcut, button) |
-| `sidepanel.html/.js/.css` | The chat: streams answers from the companion over `ws://127.0.0.1:8765/ws/chat` |
+| `sidepanel.html/.js/.css` | The chat, one saved conversation per page; streams answers from the companion over `ws://127.0.0.1:8765/ws/chat` |
+| `markdown.js` | Formats answers (lists, bold, code) safely |
 
 Nothing goes to the internet: the page text goes only to the companion app on this computer.
 

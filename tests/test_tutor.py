@@ -90,3 +90,20 @@ def test_explain_mentions_rereads():
     from companion.tutor import explain_request
     assert "reread it 3 times" in explain_request("x", "T", rereads=3)
     assert "reread" not in explain_request("x", "T", rereads=0)
+
+
+def test_load_restores_a_conversation_and_explain_can_append():
+    ollama = fake_ollama()
+    with TestClient(create_app(SimulatedBackend(), Tutor(transport=ollama))) as client:
+        with client.websocket_connect("/ws/chat") as ws:
+            ws.send_json({"type": "load", "mode": "chat", "messages": [
+                {"role": "user", "content": "What is an anode?"}, {"role": "assistant", "content": "The minus side."},
+                {"role": "system", "content": "ignored"}]})
+            assert ws.receive_json() == {"type": "loaded"}
+            chat_turn(ws, {"type": "explain", "paragraph": "Intercalation", "append": True})
+            chat_turn(ws, {"type": "explain", "paragraph": "Overpotential"})  # no append: starts over
+    first, second = ollama.chats
+    assert [m["role"] for m in first["messages"]] == ["system", "user", "assistant", "user"]
+    assert first["messages"][0]["content"].startswith("You are a patient tutor. The person is reading")
+    assert "Intercalation" in first["messages"][3]["content"]
+    assert [m["role"] for m in second["messages"]] == ["system", "user"]
