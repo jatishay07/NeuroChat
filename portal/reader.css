@@ -1,8 +1,9 @@
 /* Reading page: one calm column, glass only on what floats above it. Loaded after tutor.css. */
-.reader { display: block; width: 100%; max-width: 720px; padding-bottom: 120px; }
+/* Big type and wide gaps between paragraphs: webcam gaze is off by 2-4 cm, and paragraph boxes are what it is matched to. */
+.reader { display: block; width: 100%; max-width: 680px; padding-bottom: 120px; }
 .reader .text { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 8px 0 0; }
 .reader .text h1 { font-size: 40px; letter-spacing: -.04em; line-height: 1.1; margin: 8px 0 24px; }
-.reader .text p:not(.eyebrow) { font-size: 19px; line-height: 1.7; color: #2a2f38; margin: 0 -18px 12px; padding: 10px 18px; border-radius: 20px; box-shadow: none; transition: background .3s, box-shadow .3s; }
+.reader .text p:not(.eyebrow) { font-size: 20px; line-height: 1.75; color: #2a2f38; margin: 0 -18px 40px; padding: 10px 18px; border-radius: 20px; box-shadow: none; transition: background .3s, box-shadow .3s; }
 .reader .text p.gazed { background: rgba(255, 255, 255, .5); }
 .reader .text p.slow { background: rgba(255, 236, 214, .55); box-shadow: 0 0 0 1px rgba(229, 138, 0, .18), 0 10px 40px rgba(229, 138, 0, .12); }
 .reader .text p.asked { background: rgba(255, 236, 214, .55); box-shadow: 0 0 0 1px rgba(229, 138, 0, .18); }
@@ -59,7 +60,7 @@
 @media (prefers-reduced-transparency: reduce) {
   .card, .text, .panel, .reader .offer, .reader .tutor, .dock { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
-@media (max-width: 640px) { .reader .text h1 { font-size: 30px; } .reader .text p:not(.eyebrow) { font-size: 17px; } .dock { gap: 6px; padding-left: 12px; } }
+@media (max-width: 640px) { .reader .text h1 { font-size: 30px; } .reader .text p:not(.eyebrow) { font-size: 18px; } .dock { gap: 6px; padding-left: 12px; } }
 
 /* Recap when you finish reading. */
 .recap { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(243, 245, 249, .55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
