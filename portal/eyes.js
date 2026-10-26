@@ -6,14 +6,15 @@ const CHECK_POINTS = [[50, 50], [25, 28], [75, 28], [75, 72], [25, 72]];
 const LOOK_BEFORE_MS = 300, LOOK_AFTER_MS = 900; // frames around a dot click that calibrate it
 const CHECK_SETTLE_MS = 700, CHECK_MS = 1200; // check: wait for the eyes to land, then measure
 const MAX_GAP_MS = 250; // a longer gap between gaze samples (tab hidden, face lost) isn't reading time
-const SMOOTH_N = 5; // median of the last few gaze samples, to drop single-frame jumps
-const SWITCH_MS = 150; // the gaze has to stay on a new paragraph this long before it counts
+const MOVED_CM = 7, MOVED_MS = 3000; // head this far from where it was at calibration, this long: offer a refresh
+const REFRESH_POINTS = [[50, 30], [22, 70], [78, 70]];
 const SLOW_FACTOR = 1.5; // this many times the median time per word = "slow here"
 
 let showDot = true, showCam = true;
 let tracking = false;
-let current = -1, candidate = null, lastT = null; // paragraph being read, one it may be moving to
-let recent = []; // last few gaze points, for smoothing
+let current = -1, lastT = null; // paragraph being read
+const tracker = new ParagraphTracker(); // paragraph-tracker.js: reading-order model + drift correction
+let pose = null, poseSamples = null, movedSince = null; // head position (cm) at calibration
 let dwell = []; // ms per paragraph
 let rereads = [], furthest = -1; // times the eyes came back to a paragraph after reading past it
 let paras = [];
@@ -21,7 +22,6 @@ let webcam = null, proxy = null;
 let face = false; // is a face with open eyes in view right now?
 let latest = null; // latest gaze point {x, y, t} in page pixels
 let collect = null; // array that gaze samples go into during the accuracy check
-let margin = 60; // how far (px) above or below a paragraph a gaze point may land and still count for it
 let frames = 0, fps = 0;
 let onReady = null;
 
@@ -82,12 +82,14 @@ function onResult(r) {
   setFace(found, r.gazeState === "open");
   if (onReady) { onReady(); onReady = null; }
   if (!face) { $("gazeDot").hidden = true; if (tracking) offText(); return; }
+  watchHead(r.faceOrigin3D);
   const { x, y } = fromScreen(r.normPog);
   latest = { x, y, t: performance.now() };
   if (collect) collect.push(latest);
   const dot = $("gazeDot");
   dot.hidden = !showDot;
-  dot.style.transform = `translate(${x}px, ${y}px)`;
+  const d = tracking ? tracker.drift : { x: 0, y: 0 }; // show the gaze as the reading model sees it
+  dot.style.transform = `translate(${x - d.x}px, ${y - d.y}px)`;
   onGaze(latest);
 }
 
@@ -134,14 +136,17 @@ async function calibrate() {
   $("reader").hidden = true;
   $("calib").hidden = false;
   $("dots").innerHTML = "";
-  for (let n = 0; n < CALIB_POINTS.length; n++) await calibrationDot(CALIB_POINTS[n], n + 1);
+  for (let n = 0; n < CALIB_POINTS.length; n++) await calibrationDot(CALIB_POINTS[n], n + 1, CALIB_POINTS.length);
+  poseSamples = [];
   await checkAccuracy();
+  setPose();
+  tracker.reset(0, true);
   read();
 }
 
-function calibrationDot([px, py], n) {
+function calibrationDot([px, py], n, of) {
   const help = (t) => ($("calibHelp").textContent = t);
-  help(`Look right at the dot and click it, then keep looking until it shrinks (${n} of ${CALIB_POINTS.length}).`);
+  help(`Look right at the dot and click it, then keep looking until it shrinks (${n} of ${of}).`);
   const b = document.createElement("button");
   b.type = "button";
   b.className = "dot-target";
@@ -197,8 +202,8 @@ async function checkAccuracy() {
     $("accuracy").textContent = "No gaze samples during the check: is your face in the camera preview? Try Recalibrate.";
     return;
   }
-  const err = mean(2), errY = mean(1);
-  margin = Math.min(140, Math.max(40, errY));
+  const err = mean(2), errX = mean(0), errY = mean(1);
+  tracker.setSigma(errX * 1.25, errY * 1.25); // mean |error| → standard deviation
   const verdict = errY < 80 ? "Good: paragraphs are easy to tell apart."
     : errY < 150 ? "Okay for paragraphs; short ones may get mixed up."
     : "Too rough to tell paragraphs apart. Try Recalibrate, with your face well lit and your head still.";
@@ -222,58 +227,90 @@ function reset() {
   rereads = paras.map(() => 0);
   furthest = -1;
   current = -1;
-  candidate = null;
   lastT = null;
-  recent = [];
+  tracker.reset(paras.length);
   if (sentParagraph != null) { sentParagraph = null; sendGaze({ type: "reset" }); }
   renderBars();
-}
-
-function paragraphAt(x, y) {
-  // Gaze is noisy vertically, so allow a margin (from the accuracy check) and pick the nearest paragraph.
-  let best = -1, bestDist = margin;
-  paras.forEach((p, i) => {
-    const r = p.getBoundingClientRect();
-    if (x < r.left - 80 || x > r.right + 80) return;
-    const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
-    if (d < bestDist) { bestDist = d; best = i; }
-  });
-  return best;
 }
 
 // Face lost, tab hidden or a long gap: the current visit ends; reading resumes once the gaze settles again.
 function offText() {
   current = -1;
-  candidate = null;
+  tracker.reset(paras.length); // keeps the drift estimate
   gazeOn(-1);
   paras.forEach((p) => p.classList.remove("gazed"));
 }
 document.addEventListener("visibilitychange", () => document.hidden && tracking && offText());
 
-const median = (v) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)];
-
 function onGaze(g) {
   if (!tracking) return;
-  recent.push(g);
-  if (recent.length > SMOOTH_N) recent.shift();
-  const i = paragraphAt(median(recent.map((p) => p.x)), median(recent.map((p) => p.y)));
   const gap = lastT == null ? 0 : g.t - lastT;
   lastT = g.t;
   if (gap > MAX_GAP_MS) { offText(); return; }
   if (current >= 0) dwell[current] += gap;
-  // Only move to another paragraph once the gaze has stayed there a moment; that time then counts for it.
-  if (i === current) candidate = null;
-  else if (!candidate || candidate.i !== i) candidate = { i, since: g.t };
-  else if (g.t - candidate.since >= SWITCH_MS) {
-    if (current >= 0) dwell[current] -= g.t - candidate.since;
-    if (i >= 0) dwell[i] += g.t - candidate.since;
-    if (i >= 0 && i < furthest) rereads[i]++;
-    furthest = Math.max(furthest, i);
-    current = i;
-    gazeOn(i);
-    candidate = null;
-    paras.forEach((p, j) => p.classList.toggle("gazed", j === i));
-  }
+  const i = tracker.update(g.x, g.y, gap, paras.map((p) => p.getBoundingClientRect()));
+  if (i === current) return;
+  if (i >= 0 && i < furthest) rereads[i]++;
+  furthest = Math.max(furthest, i);
+  current = i;
+  gazeOn(i);
+  paras.forEach((p, j) => p.classList.toggle("gazed", j === i));
+}
+
+// Calibration holds for the head position it was done in. Remember that position (from the accuracy
+// check) and, if the head stays well away from it, offer a quick 3-dot refresh instead of a full redo.
+function watchHead(origin) {
+  if (!origin || origin.length !== 3 || !origin.some((v) => v)) return;
+  if (poseSamples) { poseSamples.push(origin); return; }
+  if (!pose || !tracking) return;
+  const moved = Math.hypot(origin[0] - pose[0], origin[1] - pose[1], origin[2] - pose[2]) > MOVED_CM;
+  const now = performance.now();
+  if (!moved) movedSince = null;
+  else if (movedSince == null) movedSince = now;
+  else if (now - movedSince > MOVED_MS) showMovedToast();
+}
+
+function setPose() {
+  const s = poseSamples || [];
+  poseSamples = null;
+  pose = s.length ? [0, 1, 2].map((k) => s.reduce((a, o) => a + o[k], 0) / s.length) : null;
+  movedSince = null;
+}
+
+function showMovedToast() {
+  let t = $("movedToast");
+  if (t) return;
+  t = document.createElement("div");
+  t.id = "movedToast";
+  t.className = "moved-toast";
+  t.setAttribute("role", "status");
+  t.innerHTML = `<span>You've moved since calibrating, so tracking may be off.</span>
+    <button type="button" class="primary">Quick refresh</button><button type="button" class="quiet">Not now</button>`;
+  const [fix, later] = t.querySelectorAll("button");
+  fix.onclick = () => { t.remove(); refresh(); };
+  later.onclick = () => { t.remove(); setPose(); }; // treat where they are now as the new normal
+  document.body.append(t);
+}
+
+// Three clicks on top of the existing calibration, then back to the same reading.
+async function refresh() {
+  tracking = false;
+  offText();
+  document.body.classList.remove("reading");
+  document.body.classList.add("calibrating");
+  $("reader").hidden = true;
+  $("calib").hidden = false;
+  $("dots").innerHTML = "";
+  poseSamples = [];
+  for (let n = 0; n < REFRESH_POINTS.length; n++) await calibrationDot(REFRESH_POINTS[n], n + 1, REFRESH_POINTS.length);
+  setPose();
+  tracker.reset(paras.length, true);
+  document.body.classList.remove("calibrating");
+  $("calib").hidden = true;
+  $("reader").hidden = false;
+  document.body.classList.add("reading");
+  lastT = null;
+  tracking = true;
 }
 
 // What the tutor gets about a paragraph: index and text, plus how it was read.

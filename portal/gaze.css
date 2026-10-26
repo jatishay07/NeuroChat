@@ -11,3 +11,13 @@ body.calibrating .cam { right: auto; bottom: auto; left: 50%; top: 74%; transfor
 /* A clicked calibration dot shrinks while its frames are collected: keep looking until it's gone. */
 .dot-target.hold { scale: .35; background: var(--good); border-color: var(--good); box-shadow: none; transition: scale .9s ease-in, background .3s; }
 .accuracy.warn { color: var(--bad); }
+/* "You've moved" prompt while reading: offers a 3-dot refresh. */
+.moved-toast {
+  position: fixed; z-index: 50; top: 20px; left: 50%; transform: translateX(-50%); width: min(92vw, 520px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px 12px 18px; border-radius: 22px;
+  font-size: 14px; color: var(--fg); background: var(--glass); border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 20px 50px rgba(20, 30, 60, .15);
+}
+.moved-toast span { flex: 1 1 220px; }
+.moved-toast button { width: auto; flex: 0 0 auto; margin: 0; }
