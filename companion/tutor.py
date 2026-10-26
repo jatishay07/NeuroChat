@@ -91,6 +91,43 @@ class Tutor:
             raise TutorError("Ollama isn't running. Start NeuroChat with the neurochat command to start it.") from e
 
 
+def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_words: float | None = None,
+                 rereads: int | None = None, visits: int | None = None,
+                 engagement: float | None = None, median_engagement: float | None = None) -> str:
+    """What the eye tracker and the headset saw on this paragraph, written for the system prompt,
+    with what each signal means for how to explain. Anything not measured is left out, so the model
+    never sees made-up numbers. engagement is Pope's beta / (alpha + theta) from real EEG only."""
+    seen, advice = [], []
+    if dwell_ms_per_100_words:
+        line = f"- Reading time: {dwell_ms_per_100_words / 1000:.0f} s per 100 words"
+        if median_ms_per_100_words:
+            ratio = dwell_ms_per_100_words / median_ms_per_100_words
+            line += f", {ratio:.1f}× their usual pace in this text"
+        seen.append(line + ".")
+    went_back = max(rereads or 0, (visits or 1) - 1)
+    if went_back:
+        seen.append(f"- They went back to this paragraph {went_back} time{'s' if went_back > 1 else ''}.")
+        if went_back >= 2:
+            advice.append("They kept rereading, so one specific sentence or term is probably the blocker: "
+                          "name the part most likely to trip someone up and explain that first.")
+    if engagement is not None and median_engagement:
+        rel = engagement / median_engagement
+        seen.append(f"- EEG engagement here: {engagement:.2f}, against {median_engagement:.2f} on the rest of the text"
+                    f" ({rel:.0%} of usual).")
+        if rel < 0.8:
+            advice.append("Their attention dropped on this paragraph, so it likely lost them rather than challenged them: "
+                          "lead with a concrete example, keep sentences short, and stay under 90 words.")
+        else:
+            advice.append("They stayed focused yet still slowed down, so the content itself is hard: "
+                          "go step by step and define every technical term before using it.")
+    if not seen:
+        return ""
+    notes = "\n\nWhat the eye tracker and headset measured on this paragraph:\n" + "\n".join(seen)
+    if advice:
+        notes += "\nAdapt your explanation to this:\n" + "\n".join(f"- {a}" for a in advice)
+    return notes + "\nDon't mention these measurements unless they ask."
+
+
 def explain_request(paragraph: str, title: str | None = None, context: str | None = None) -> str:
     """paragraph is what to explain: a paragraph, or a passage the reader selected. context is the
     paragraph around a selection, so a short selection ("Gibbs free energy") isn't explained blind."""

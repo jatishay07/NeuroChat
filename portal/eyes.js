@@ -315,8 +315,10 @@ async function refresh() {
 
 // What the tutor gets about a paragraph: index and text, plus how it was read.
 function paragraphDetail(i) {
-  const dwellMsPer100Words = Math.round((dwell[i] / wordCount(paras[i])) * 100);
-  return { index: i, text: paras[i].textContent.trim(), dwellMsPer100Words, rereads: rereads[i] };
+  const per100 = paras.map((p, j) => (dwell[j] / wordCount(p)) * 100);
+  const read = per100.filter((v) => v > 0).sort((a, b) => a - b);
+  const medianMsPer100Words = read.length ? Math.round(read[Math.floor(read.length / 2)]) : null;
+  return { index: i, text: paras[i].textContent.trim(), dwellMsPer100Words: Math.round(per100[i]), medianMsPer100Words, rereads: rereads[i] };
 }
 
 function wordCount(p) {

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from .device import Backend, BackendError, BrowserHeadset, DeviceManager
 from .gaze import GazeSession, visit_json
-from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request
+from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request, reader_notes
 from .webui import WebUI, WebUIError
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
@@ -136,11 +136,33 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         """Straight to the chat: NeuroChat's own chat page. Open WebUI stays one click away from it."""
         return RedirectResponse("/chat.html")
 
+    def signals_for(msg: dict) -> str:
+        """The reading page's numbers for this paragraph plus the gaze log's visits and engagement.
+        Engagement is passed on only while a real headset streams: the fake one's EEG means nothing."""
+        def num(key):
+            v = msg.get(key)
+            return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+        index = msg.get("index")
+        row, median = None, None
+        if isinstance(index, int):
+            summary = gaze.summary()
+            row = next((r for r in summary["paragraphs"] if r["paragraph"] == index), None)
+            median = summary["median_engagement"]
+        real_eeg = device.state == "streaming" and not getattr(device.backend, "simulated", False)
+        return reader_notes(
+            num("dwellMsPer100Words"), num("medianMsPer100Words"),
+            int(msg["rereads"]) if isinstance(msg.get("rereads"), int) else None,
+            row["visits"] if row else None,
+            row["engagement"] if row and real_eeg else None,
+            median if real_eeg else None,
+        )
+
     @app.websocket("/ws/chat")
     async def chat(ws: WebSocket):
         """One conversation with the tutor. The client sends
         {"type": "explain", "paragraph": ..., "title": ..., "context": ...} to start on a paragraph
-        (or a selected passage, with the paragraph around it as optional context), or
+        (or a selected passage, with the paragraph around it as optional context), optionally with what
+        the reading page measured: "index", "dwellMsPer100Words", "medianMsPer100Words", "rereads"; or
         {"type": "ask", "text": ...} for a follow-up. Replies stream back as
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
         or {"type": "error", "message": ...}.
@@ -166,7 +188,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                     continue
                 if msg.get("type") == "explain" and msg.get("paragraph"):
                     title = f"Explaining: {msg['paragraph'][:60].strip()}…"
-                    system = SYSTEM_PROMPT
+                    system = SYSTEM_PROMPT + signals_for(msg)
                     history = [{"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000])}]
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph

@@ -84,3 +84,42 @@ def test_explain_a_selection_with_its_paragraph():
                            "context": "The potential arises from the disparity in Gibbs free energy of lithium."})
     asked = ollama.chats[0]["messages"][1]["content"]
     assert '"""Gibbs free energy"""' in asked and "It's from this paragraph" in asked and "disparity" in asked
+
+
+def test_reader_notes_turn_signals_into_advice():
+    from companion.tutor import reader_notes
+    assert reader_notes() == ""
+    lost = reader_notes(46000, 23000, rereads=2, engagement=0.36, median_engagement=0.6)
+    assert "46 s per 100 words, 2.0× their usual pace" in lost
+    assert "went back to this paragraph 2 times" in lost and "rereading" in lost
+    assert "attention dropped" in lost and "60% of usual" in lost
+    focused = reader_notes(46000, 23000, engagement=0.62, median_engagement=0.6)
+    assert "content itself is hard" in focused and "went back" not in focused
+
+
+def test_explain_puts_reading_signals_in_the_system_prompt():
+    ollama = fake_ollama()
+    with TestClient(create_app(SimulatedBackend(), Tutor(transport=ollama))) as client:
+        with client.websocket_connect("/ws/chat") as ws:
+            chat_turn(ws, {"type": "explain", "paragraph": "Intercalation...", "index": 2,
+                           "dwellMsPer100Words": 46000, "medianMsPer100Words": 23000, "rereads": 1})
+            system = ollama.chats[-1]["messages"][0]["content"]
+            assert "2.0× their usual pace" in system and "went back to this paragraph 1 time." in system
+            # The simulated headset's EEG is noise, so its engagement never reaches the model.
+            assert "EEG engagement" not in system
+            chat_turn(ws, {"type": "explain", "paragraph": "No numbers here"})
+            assert "measured" not in ollama.chats[-1]["messages"][0]["content"]
+
+
+def test_real_headset_engagement_reaches_the_prompt():
+    from companion.gaze import Visit
+    ollama = fake_ollama()
+    app = create_app(SimulatedBackend(), Tutor(transport=ollama))
+    app.state.device.state = "streaming"
+    app.state.device.backend.simulated = False  # stand in for a real Athena
+    app.state.gaze.visits = [Visit(0, 0, 10, 0.6), Visit(1, 10, 20, 0.6), Visit(2, 20, 40, 0.3), Visit(2, 45, 50, 0.3)]
+    with TestClient(app) as client, client.websocket_connect("/ws/chat") as ws:
+        chat_turn(ws, {"type": "explain", "paragraph": "x", "index": 2})
+        system = ollama.chats[-1]["messages"][0]["content"]
+        assert "EEG engagement here: 0.30, against 0.60" in system and "attention dropped" in system
+        assert "went back to this paragraph 1 time." in system
