@@ -84,3 +84,9 @@ def test_explain_a_selection_with_its_paragraph():
                            "context": "The potential arises from the disparity in Gibbs free energy of lithium."})
     asked = ollama.chats[0]["messages"][1]["content"]
     assert '"""Gibbs free energy"""' in asked and "It's from this paragraph" in asked and "disparity" in asked
+
+
+def test_explain_mentions_rereads():
+    from companion.tutor import explain_request
+    assert "reread it 3 times" in explain_request("x", "T", rereads=3)
+    assert "reread" not in explain_request("x", "T", rereads=0)

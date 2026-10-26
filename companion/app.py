@@ -167,7 +167,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                 if msg.get("type") == "explain" and msg.get("paragraph"):
                     title = f"Explaining: {msg['paragraph'][:60].strip()}…"
                     system = SYSTEM_PROMPT
-                    history = [{"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000])}]
+                    history = [{"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000],
+                                                         msg.get("rereads") if isinstance(msg.get("rereads"), int) else None)}]
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]

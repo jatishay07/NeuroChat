@@ -35,5 +35,9 @@ short phrase isn't explained without its context. **New chat** clears it.
 
 Nothing goes to the internet: the page text goes only to the companion app on this computer.
 
-Not yet: offering help by itself when eye tracking or the headset says you're stuck on a paragraph,
-and a floating chat for apps other than Chrome.
+When eye tracking says you're stuck on a paragraph, a small **Stuck here? Explain** offer appears
+next to it. The eye tracker sends a `neurochat:slow` window event with
+`{index, text, dwellMsPer100Words, rereads, element}`, and `content.js` shows the offer. **✕** stops
+it asking about that paragraph again. The eye tracking for any page (`extension/gaze/`) is being built.
+
+Not yet: a floating chat for apps other than Chrome.

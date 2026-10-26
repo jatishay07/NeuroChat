@@ -97,7 +97,7 @@ function explain(req) {
   reset();
   const quote = add("quote", req.text);
   if (req.title) quote.append(Object.assign(document.createElement("small"), { textContent: req.title }));
-  send({ type: "explain", paragraph: req.text, context: req.context, title: req.title });
+  send({ type: "explain", paragraph: req.text, context: req.context, title: req.title, rereads: req.rereads });
 }
 
 // Requests from the page (Explain button, right-click menu, shortcut) arrive through session storage.
