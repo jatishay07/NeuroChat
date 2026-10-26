@@ -8,12 +8,17 @@ const CHECK_SETTLE_MS = 700, CHECK_MS = 1200; // check: wait for the eyes to lan
 const MAX_GAP_MS = 250; // a longer gap between gaze samples (tab hidden, face lost) isn't reading time
 const MOVED_CM = 7, MOVED_MS = 3000; // head this far from where it was at calibration, this long: offer a refresh
 const REFRESH_POINTS = [[50, 30], [22, 70], [78, 70]];
+const PURSUIT_ROWS = [12, 31, 50, 69, 88], PURSUIT_ROW_MS = 3000, PURSUIT_PAUSE_MS = 700; // follow-the-dot, % of the page
+const CAMERA = { width: 1280, height: 720 }; // more pixels on the eyes than WebEyeTrack's default 640x480
 const SLOW_FACTOR = 1.5; // this many times the median time per word = "slow here"
 
 let showDot = true, showCam = true;
 let tracking = false;
 let current = -1, lastT = null; // paragraph being read
 const tracker = new ParagraphTracker(); // paragraph-tracker.js: reading-order model + drift correction
+const correction = new GazeCorrection(); // gaze-correction.js: personal fit on top of WebEyeTrack's
+let history = []; // the tracker's last few seconds of raw output {t (Date.now()), g}, for clicks and refreshes
+let pursuit = null; // samples while following the moving dot
 let pose = null, poseSamples = null, movedSince = null; // head position (cm) at calibration
 let dwell = []; // ms per paragraph
 let rereads = [], furthest = -1; // times the eyes came back to a paragraph after reading past it
@@ -83,7 +88,11 @@ function onResult(r) {
   if (onReady) { onReady(); onReady = null; }
   if (!face) { $("gazeDot").hidden = true; if (tracking) offText(); return; }
   watchHead(r.faceOrigin3D);
-  const { x, y } = fromScreen(r.normPog);
+  const g = { pog: r.normPog, origin: r.faceOrigin3D, head: r.headVector };
+  history.push({ t: Date.now(), g });
+  while (history.length && history[0].t < Date.now() - 3000) history.shift();
+  if (pursuit) pursuit.push({ t: performance.now(), g });
+  const { x, y } = fromScreen(correction.apply(g));
   latest = { x, y, t: performance.now() };
   if (collect) collect.push(latest);
   const dot = $("gazeDot");
@@ -109,7 +118,7 @@ async function start() {
     return;
   }
   $("cam").hidden = false;
-  webcam = new WebcamClient("camVideo");
+  webcam = new WebcamClient("camVideo", CAMERA);
   // We send calibration points ourselves (in screen coordinates), so turn off its own click listener.
   proxy = new WebEyeTrackProxy(webcam, {
     autoClick: false,
@@ -121,30 +130,45 @@ async function start() {
   onReady = () => { clearTimeout(timeout); say(""); calibrate(); };
 }
 
-// While reading, a click is a hint that the eyes are on the spot clicked; the tracker keeps the last few.
+// While reading, a click is a hint that the eyes are on the spot clicked: it refines the personal
+// correction (not WebEyeTrack's own fit, which the correction is built on top of).
 addEventListener("pointerdown", (e) => {
-  if (tracking && proxy && e.isPrimary) proxy.click(...toScreen(e.clientX, e.clientY));
+  if (!tracking || !e.isPrimary) return;
+  const recent = history.filter((h) => h.t > Date.now() - 200);
+  if (recent.length) correction.addClick(recent[recent.length - 1].g, toScreen(e.clientX, e.clientY));
 });
 
 async function calibrate() {
   tracking = false;
   if (sentParagraph != null) gazeOn(-1);
   proxy.resetCalibration();
+  correction.clear();
   document.body.classList.remove("reading");
   document.body.classList.add("calibrating");
   $("intro").hidden = true;
   $("reader").hidden = true;
   $("calib").hidden = false;
   $("dots").innerHTML = "";
-  for (let n = 0; n < CALIB_POINTS.length; n++) await calibrationDot(CALIB_POINTS[n], n + 1, CALIB_POINTS.length);
+  for (let n = 0; n < CALIB_POINTS.length; n++) await calibrationDot(CALIB_POINTS[n], n + 1, CALIB_POINTS.length, trainTracker);
   poseSamples = [];
+  await followTheDot();
   await checkAccuracy();
   setPose();
   tracker.reset(0, true);
   read();
 }
 
-function calibrationDot([px, py], n, of) {
+// What a looked-at dot trains: WebEyeTrack itself (first calibration) or the personal correction
+// on top of it (refreshes). Each returns how many frames it used.
+const trainTracker = (target, from, to) => proxy.calibrate(...target, from, to);
+function trainCorrection(target, from, to) {
+  const frames = history.filter((h) => h.t >= from && h.t <= to);
+  frames.forEach((h) => correction.add(h.g, target, 4));
+  if (frames.length) correction.fit();
+  return Promise.resolve(frames.length);
+}
+
+function calibrationDot([px, py], n, of, train) {
   const help = (t) => ($("calibHelp").textContent = t);
   help(`Look right at the dot and click it, then keep looking until it shrinks (${n} of ${of}).`);
   const b = document.createElement("button");
@@ -163,7 +187,7 @@ function calibrationDot([px, py], n, of) {
       b.classList.add("hold");
       await sleep(Math.max(LOOK_AFTER_MS, Math.min(3000, 3000 / (fps || 1)))); // at least ~3 frames
       const r = b.getBoundingClientRect();
-      const used = await proxy.calibrate(...toScreen(r.left + r.width / 2, r.top + r.height / 2), from, Date.now());
+      const used = await train(toScreen(r.left + r.width / 2, r.top + r.height / 2), from, Date.now());
       if (!used) {
         b.disabled = false;
         b.classList.remove("hold");
@@ -174,6 +198,54 @@ function calibrationDot([px, py], n, of) {
       resolve();
     };
   });
+}
+
+// Follow a dot sweeping across the screen in rows, like reading lines. A few hundred samples over the
+// whole screen fit the personal correction. The eyes (and the tracker's smoothing) trail the dot, so
+// the fit tries a range of delays and keeps the best one.
+async function followTheDot() {
+  $("calibHelp").textContent = "Now follow the dot with your eyes as it moves, like reading lines of text.";
+  $("dots").innerHTML = "";
+  const d = document.createElement("div");
+  d.className = "dot-target pursuit";
+  $("dots").append(d);
+  const track = []; // {t, x, y} page px while the dot moves along a row
+  pursuit = [];
+  for (const row of PURSUIT_ROWS) {
+    d.style.left = "6%";
+    d.style.top = `${row}%`;
+    await sleep(PURSUIT_PAUSE_MS); // let the eyes jump to the row start
+    const t0 = performance.now();
+    await new Promise((done) => {
+      const step = () => {
+        const k = Math.min(1, (performance.now() - t0) / PURSUIT_ROW_MS);
+        const px = 6 + 88 * k;
+        d.style.left = `${px}%`;
+        track.push({ t: performance.now(), x: (px / 100) * innerWidth, y: (row / 100) * innerHeight, row });
+        k < 1 ? requestAnimationFrame(step) : done();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  const samples = pursuit;
+  pursuit = null;
+  $("dots").innerHTML = "";
+  const targetAt = (t) => { // dot position at time t, if it was moving along one row then
+    let i = track.findIndex((p) => p.t >= t);
+    if (i <= 0) return null;
+    const a = track[i - 1], b = track[i];
+    if (a.row !== b.row || b.t - a.t > 100) return null;
+    const k = (t - a.t) / (b.t - a.t);
+    return toScreen(a.x + (b.x - a.x) * k, a.y);
+  };
+  let best = null;
+  for (let lag = 0; lag <= 500; lag += 50) {
+    const c = new GazeCorrection();
+    for (const s of samples) { const target = targetAt(s.t - lag); if (target) c.add(s.g, target); }
+    const rms = c.fit();
+    if (rms != null && (!best || rms < best.rms)) best = { rms, lag, c };
+  }
+  if (best) { correction.samples = best.c.samples; correction.model = best.c.model; }
 }
 
 async function checkAccuracy() {
@@ -193,8 +265,8 @@ async function checkAccuracy() {
     await sleep(CHECK_MS);
     errs.push(...collect.map((p) => [Math.abs(p.x - tx), Math.abs(p.y - ty), Math.hypot(p.x - tx, p.y - ty)]));
     collect = null;
-    // Measured first, so the number is honest; then the same frames sharpen the calibration.
-    await proxy.calibrate(...toScreen(tx, ty), from, Date.now());
+    // Measured first, so the number is honest; then the same frames sharpen the correction.
+    await trainCorrection(toScreen(tx, ty), from, Date.now());
   }
   $("dots").innerHTML = "";
   const mean = (k) => errs.reduce((a, e) => a + e[k], 0) / errs.length;
@@ -302,7 +374,7 @@ async function refresh() {
   $("calib").hidden = false;
   $("dots").innerHTML = "";
   poseSamples = [];
-  for (let n = 0; n < REFRESH_POINTS.length; n++) await calibrationDot(REFRESH_POINTS[n], n + 1, REFRESH_POINTS.length);
+  for (let n = 0; n < REFRESH_POINTS.length; n++) await calibrationDot(REFRESH_POINTS[n], n + 1, REFRESH_POINTS.length, trainCorrection);
   setPose();
   tracker.reset(paras.length, true);
   document.body.classList.remove("calibrating");
