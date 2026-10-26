@@ -139,7 +139,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
     @app.websocket("/ws/chat")
     async def chat(ws: WebSocket):
         """One conversation with the tutor. The client sends
-        {"type": "explain", "paragraph": ..., "title": ...} to start on a paragraph, or
+        {"type": "explain", "paragraph": ..., "title": ..., "context": ...} to start on a paragraph
+        (or a selected passage, with the paragraph around it as optional context), or
         {"type": "ask", "text": ...} for a follow-up. Replies stream back as
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
         or {"type": "error", "message": ...}.
@@ -166,7 +167,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                 if msg.get("type") == "explain" and msg.get("paragraph"):
                     title = f"Explaining: {msg['paragraph'][:60].strip()}…"
                     system = SYSTEM_PROMPT
-                    history = [{"role": "user", "content": explain_request(msg["paragraph"], msg.get("title"))}]
+                    history = [{"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000])}]
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]

@@ -74,3 +74,13 @@ def test_errors_are_reported_not_raised():
             events = chat_turn(ws, {"type": "explain", "paragraph": "x"})
             assert events[-1]["type"] == "error" and "isn't running" in events[-1]["message"]
             assert chat_turn(ws, {"type": "nonsense"})[-1]["type"] == "error"
+
+
+def test_explain_a_selection_with_its_paragraph():
+    ollama = fake_ollama()
+    with TestClient(create_app(SimulatedBackend(), Tutor(transport=ollama))) as client:
+        with client.websocket_connect("/ws/chat") as ws:
+            chat_turn(ws, {"type": "explain", "paragraph": "Gibbs free energy", "title": "Batteries",
+                           "context": "The potential arises from the disparity in Gibbs free energy of lithium."})
+    asked = ollama.chats[0]["messages"][1]["content"]
+    assert '"""Gibbs free energy"""' in asked and "It's from this paragraph" in asked and "disparity" in asked
