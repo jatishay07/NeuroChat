@@ -198,13 +198,16 @@ index 387a080..cf182c7 100644
      this.latestGazeResult = gaze_result;
      return gaze_result;
 diff --git a/js/src/WebEyeTrackProxy.ts b/js/src/WebEyeTrackProxy.ts
-index eb8668e..a1efb62 100644
+index eb8668e..5ea0359 100644
 --- a/js/src/WebEyeTrackProxy.ts
 +++ b/js/src/WebEyeTrackProxy.ts
-@@ -3,12 +3,22 @@ import { GazeResult } from "./types";
+@@ -2,13 +2,24 @@ import WebcamClient from "./WebcamClient";
+ import { GazeResult } from "./types";
  
  // @ts-ignore
- import WebEyeTrackWorker from "worker-loader?inline=no-fallback!./WebEyeTrackWorker.ts";
+-import WebEyeTrackWorker from "worker-loader?inline=no-fallback!./WebEyeTrackWorker.ts";
++// A separate file next to the bundle, not a blob: Chrome extension pages forbid blob workers.
++import WebEyeTrackWorker from "worker-loader?filename=webeyetrack.worker.js!./WebEyeTrackWorker.ts";
 +export interface WebEyeTrackProxyOptions {
 +  autoClick?: boolean;      // learn from every click on the page (default true); false = call click() yourself
 +  maxPoints?: number;       // click points kept
@@ -225,7 +228,7 @@ index eb8668e..a1efb62 100644
  
      // Initialize the WebEyeTrackWorker
      this.worker = new WebEyeTrackWorker();
-@@ -46,6 +56,13 @@ export default class WebEyeTrackProxy {
+@@ -46,6 +57,13 @@ export default class WebEyeTrackProxy {
            this.onGazeResults(gazeResult);
            break;
  
@@ -239,7 +242,7 @@ index eb8668e..a1efb62 100644
          case 'statusUpdate':
            this.status = mess.data.status;
            break;
-@@ -61,10 +78,11 @@ export default class WebEyeTrackProxy {
+@@ -61,10 +79,11 @@ export default class WebEyeTrackProxy {
      // (e.g. GitHub Pages project sites served from a subpath) rather than
      // always assuming the domain root.
      const baseUrl = new URL('.', document.baseURI).toString();
@@ -253,7 +256,7 @@ index eb8668e..a1efb62 100644
        // Convert px to normalized coordinates
        const normX = (e.clientX / window.innerWidth) - 0.5;
        const normY = (e.clientY / window.innerHeight) - 0.5;
-@@ -73,6 +91,25 @@ export default class WebEyeTrackProxy {
+@@ -73,6 +92,25 @@ export default class WebEyeTrackProxy {
      })
    }
  
@@ -352,3 +355,60 @@ index e7496d9..db06e7e 100644
  
      default:
        console.warn(`[WebEyeTrackWorker] Unknown message type: ${type}`);
+diff --git a/js/src/WebcamClient.ts b/js/src/WebcamClient.ts
+index 2e3fe34..23e6bc6 100644
+--- a/js/src/WebcamClient.ts
++++ b/js/src/WebcamClient.ts
+@@ -4,7 +4,11 @@ export default class WebcamClient {
+     private stream?: MediaStream;
+     private frameCallback?: (frame: ImageData, timestamp: number) => Promise<void>;
+ 
+-    constructor(videoElementId: string) {
++    private size: { width: number, height: number };
++
++    // size: the camera resolution to ask for. More pixels on the face give sharper eye patches.
++    constructor(videoElementId: string, size: { width: number, height: number } = { width: 640, height: 480 }) {
++        this.size = size;
+         const videoElement = document.getElementById(videoElementId) as HTMLVideoElement;
+         if (!videoElement) {
+             throw new Error(`Video element with id '${videoElementId}' not found`);
+@@ -18,8 +22,8 @@ export default class WebcamClient {
+                 video: {
+                     // width: { ideal: 1280 },
+                     // height: { ideal: 720 },
+-                    width: { ideal: 640 },
+-                    height: { ideal: 480 },
++                    width: { ideal: this.size.width },
++                    height: { ideal: this.size.height },
+                     facingMode: "user"
+                 },
+                 audio: false
+@@ -69,10 +73,12 @@ export default class WebcamClient {
+                 await this.frameCallback(imageData, this.videoElement.currentTime);
+             }
+ 
+-            // Request the next frame
+-            requestAnimationFrame(process);
++            // Request the next frame. A hidden page (background tab, extension offscreen document)
++            // gets no animation frames, so fall back to a ~30 fps timer there.
++            next();
+         };
++        const next = () => document.hidden ? setTimeout(process, 33) : requestAnimationFrame(process);
+ 
+-        requestAnimationFrame(process);
++        next();
+     }
+ }
+\ No newline at end of file
+diff --git a/js/webpack.config.js b/js/webpack.config.js
+index 4c80dd7..76b9fc7 100644
+--- a/js/webpack.config.js
++++ b/js/webpack.config.js
+@@ -16,6 +16,7 @@ const manager = {
+     },
+     output: {
+         filename: 'index.js',
++        publicPath: 'auto', // the worker file is loaded from next to the bundle
+         path: path.resolve(__dirname, 'dist'),
+         libraryTarget: 'umd',
+         globalObject: 'typeof self !== \'undefined\' ? self : this'

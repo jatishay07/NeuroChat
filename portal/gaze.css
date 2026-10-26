@@ -21,3 +21,5 @@ body.calibrating .cam { right: auto; bottom: auto; left: 50%; top: 74%; transfor
 }
 .moved-toast span { flex: 1 1 220px; }
 .moved-toast button { width: auto; flex: 0 0 auto; margin: 0; }
+/* The follow-the-dot step: a solid dot that glides along rows. */
+.dot-target.pursuit { border-color: var(--fg); background: var(--fg); pointer-events: none; }
