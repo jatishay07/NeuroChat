@@ -145,7 +145,11 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
         or {"type": "error", "message": ...}.
         {"type": "continue"} copies the conversation into Open WebUI and answers
-        {"type": "continued", "url": ...} (or an error), so it can carry on there."""
+        {"type": "continued", "url": ...} (or an error), so it can carry on there.
+        The side chat keeps one conversation per page and restores it with
+        {"type": "load", "messages": [{"role", "content"}...], "mode": "explain" | "chat"} (answered
+        {"type": "loaded"}), and sends {"type": "explain", ..., "append": true} to add a new passage to
+        the conversation instead of starting over."""
         await ws.accept()
         history: list[dict] = []
         title = "Chat with the tutor"
@@ -164,10 +168,21 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                         continue
                     await ws.send_json({"type": "continued", "url": url})
                     continue
+                if msg.get("type") == "load":
+                    history = [{"role": m["role"], "content": str(m["content"])[:12000]}
+                               for m in msg.get("messages") or []
+                               if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")][-40:]
+                    system = CHAT_PROMPT if msg.get("mode") == "chat" else SYSTEM_PROMPT
+                    title = (msg.get("title") or title)[:80]
+                    await ws.send_json({"type": "loaded"})
+                    continue
                 if msg.get("type") == "explain" and msg.get("paragraph"):
-                    title = f"Explaining: {msg['paragraph'][:60].strip()}…"
-                    system = SYSTEM_PROMPT
-                    history = [{"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000])}]
+                    if not (msg.get("append") and history):
+                        title = f"Explaining: {msg['paragraph'][:60].strip()}…"
+                        system = SYSTEM_PROMPT
+                        history = []
+                    history.append({"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000],
+                                                         msg.get("rereads") if isinstance(msg.get("rereads"), int) else None)})
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]

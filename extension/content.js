@@ -1,5 +1,6 @@
 // NeuroChat on any page: an "Explain" button next to text you select, and the selection plus
 // the paragraph around it for the side chat (also used by the right-click menu and the shortcut).
+// When eye tracking (extension/gaze/) says you're stuck on a paragraph, it offers to explain it.
 (() => {
   const MIN = 2, MAX = 4000;
 
@@ -25,6 +26,13 @@
     };
   }
 
+  // The readable text of the page, for "Summarize this page" and questions about it.
+  function pageText() {
+    const main = document.querySelector("article, main, [role=main]") || document.body;
+    const text = (main.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+    return { title: document.title, url: location.href, text: text.slice(0, 12000) };
+  }
+
   // The floating button, in a shadow root so the page's styles can't reach it.
   const host = document.createElement("neurochat-pill");
   const root = host.attachShadow({ mode: "closed" });
@@ -36,8 +44,21 @@
     button:hover { background: #262a33; }
     button.on { display: inline-flex; }
     i { width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: .85; }
-  </style><button type="button" aria-label="Explain the selected text with NeuroChat"><i></i>Explain</button>`;
-  const pill = root.querySelector("button");
+    .offer { position: absolute; z-index: 2147483647; display: none; align-items: center; gap: 4px; padding: 4px 4px 4px 12px;
+      border-radius: 999px; background: rgba(255, 255, 255, .92); border: 1px solid rgba(11, 13, 18, .1);
+      box-shadow: 0 8px 26px rgba(20, 30, 60, .18);
+      font: 500 13px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, sans-serif; color: #0b0d12; }
+    .offer.on { display: inline-flex; }
+    .offer button { position: static; display: inline-flex; padding: 5px 12px; }
+    .offer button.x { background: transparent; color: #4b5260; box-shadow: none; padding: 5px 9px; }
+    .offer button.x:hover { background: rgba(11, 13, 18, .06); }
+  </style><button type="button" id="pill" aria-label="Explain the selected text with NeuroChat"><i></i>Explain</button>
+  <div class="offer" id="offer" role="dialog" aria-label="NeuroChat">
+    <span>Stuck here?</span>
+    <button type="button" id="offerYes">Explain</button>
+    <button type="button" class="x" id="offerNo" aria-label="Not now">✕</button>
+  </div>`;
+  const pill = root.getElementById("pill");
   let pending = null;
 
   function hide() { pill.classList.remove("on"); pending = null; }
@@ -67,9 +88,38 @@
     hide();
   });
 
-  (document.body || document.documentElement).append(host);
+  // Offer to explain a paragraph eye tracking says you're stuck on. gaze/gaze-content.js sends
+  // window "neurochat:slow" with {index, text, dwellMsPer100Words, rereads, element}.
+  const offer = root.getElementById("offer");
+  const declined = new Set();
+  let offered = null;
+
+  function hideOffer() { offer.classList.remove("on"); offered = null; }
+
+  addEventListener("neurochat:slow", (e) => {
+    const d = e.detail || {};
+    if (!d.text || offered || declined.has(d.text)) return;
+    offered = d;
+    offer.classList.add("on");
+    const r = d.element?.getBoundingClientRect();
+    const w = offer.offsetWidth || 200;
+    offer.style.left = `${scrollX + (r ? Math.min(r.right - w, innerWidth - w - 8) : innerWidth - w - 16)}px`;
+    offer.style.top = `${scrollY + (r ? Math.max(8, r.top - offer.offsetHeight - 6) : 16)}px`;
+  });
+  root.getElementById("offerYes").addEventListener("click", () => {
+    if (!offered) return;
+    chrome.runtime.sendMessage({ type: "neurochat:explain", request: {
+      text: offered.text.slice(0, MAX), title: document.title, url: location.href,
+      dwellMsPer100Words: offered.dwellMsPer100Words, rereads: offered.rereads,
+    } }).catch(() => {});
+    hideOffer();
+  });
+  root.getElementById("offerNo").addEventListener("click", () => { if (offered) declined.add(offered.text); hideOffer(); });
+
+  document.documentElement.append(host); // not body: a positioned body would shift the offer
 
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (msg.type === "neurochat:selection") reply(selection());
+    if (msg.type === "neurochat:page") reply(pageText());
   });
 })();
