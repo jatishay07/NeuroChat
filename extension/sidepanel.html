@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeuroChat</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header>
+    <span class="brand">NeuroChat</span>
+    <button id="newBtn" type="button" class="quiet" hidden>New chat</button>
+  </header>
+  <main id="log" aria-live="polite">
+    <div class="empty" id="empty">
+      <h1>Stuck on something?</h1>
+      <p>Select text on the page and click <b>Explain</b>, right-click it, or press <kbd>Alt</kbd><kbd>Shift</kbd><kbd>E</kbd>. You can also just ask below.</p>
+    </div>
+  </main>
+  <footer>
+    <p id="status" class="status" role="status"></p>
+    <form id="ask" class="ask">
+      <input id="askInput" type="text" placeholder="Ask about what you're reading…" autocomplete="off" aria-label="Ask the tutor">
+      <button id="askBtn" type="submit" aria-label="Send">&#8593;</button>
+    </form>
+  </footer>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

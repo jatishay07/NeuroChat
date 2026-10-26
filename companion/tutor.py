@@ -91,6 +91,11 @@ class Tutor:
             raise TutorError("Ollama isn't running. Start NeuroChat with the neurochat command to start it.") from e
 
 
-def explain_request(paragraph: str, title: str | None = None) -> str:
+def explain_request(paragraph: str, title: str | None = None, context: str | None = None) -> str:
+    """paragraph is what to explain: a paragraph, or a passage the reader selected. context is the
+    paragraph around a selection, so a short selection ("Gibbs free energy") isn't explained blind."""
     where = f' in a text titled "{title}"' if title else ""
+    if context and context.strip() != paragraph.strip():
+        return (f"I got stuck on this part{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\"\n\n"
+                f"It's from this paragraph:\n\n\"\"\"{context}\"\"\"")
     return f"I got stuck on this paragraph{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\""

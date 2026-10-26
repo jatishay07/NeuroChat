@@ -12,7 +12,7 @@ Everything runs on your own computer:
 | Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection and tutor chat (Ollama) done |
 | Portal: connect screen, eye tracking, then the chat | `portal/` | Connect screen and eye-tracking test done |
 | Chat portal: [Open WebUI](https://openwebui.com), for carrying on conversations | started by `neurochat` | Done |
-| Browser extension: paragraphs and webcam gaze on any page | `extension/` | Next |
+| Side chat: Chrome extension that explains what you select on any page | `extension/` | Explain-on-select, right-click, shortcut; [install](extension/README.md) |
 
 Build plan: [Struggle-Aware Tutor Build Plan](https://claude.ai/artifact/B7heEKCnARoA9t1QNRfA4D).
 
