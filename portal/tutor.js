@@ -96,11 +96,12 @@
     (await connect()).send(JSON.stringify(msg));
   }
 
-  function explain({ index, text }) {
+  function explain({ index, text, dwellMsPer100Words, medianMsPer100Words, rereads }) {
     $("offer").hidden = true;
     offered = null;
     $("chat").replaceChildren(); // a new paragraph starts a new conversation
-    send({ type: "explain", paragraph: text, title: title() }, `Explain paragraph ${index + 1}`);
+    // What the eye tracker measured goes along, so the tutor can pitch the explanation (companion/tutor.py).
+    send({ type: "explain", paragraph: text, title: title(), index, dwellMsPer100Words, medianMsPer100Words, rereads }, `Explain paragraph ${index + 1}`);
   }
 
   function offer(detail) {
