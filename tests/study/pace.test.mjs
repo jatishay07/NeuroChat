@@ -148,3 +148,9 @@ test("S1 (round 5): an unpunctuated list ends where a capitalised paragraph star
   const md = P.parseText("# Notes\n\nIntro text that is long enough here.\n\n## Short bit\n\nTiny.");
   assert.deepEqual(md.headings, [null, "Short bit"]);
 });
+
+test("S1 (round 6): a wrapped item that carries on with a capital (a name) stays in its list", () => {
+  const r = P.parseText("The congress settled several questions:\n1. The borders of France were returned to those of\nNapoleon's predecessors in 1792.\n2. The Netherlands and the Austrian\nNetherlands were united under William I.\n3. Prussia gained territory in the Rhineland.");
+  assert.equal(r.paragraphs.length, 1, JSON.stringify(r));
+  assert.match(r.paragraphs[0], /those of Napoleon's predecessors in 1792\.\n2\. The Netherlands and the Austrian Netherlands/);
+});

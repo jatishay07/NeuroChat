@@ -145,11 +145,13 @@
         // One block per line, except that a list (and the "Steps:" line that leads into it) stays together.
         blocks = [];
         // A list item that wraps onto the next line carries on in the same block too.
-        for (const l of lines) {
+        for (const [i, l] of lines.entries()) {
           const last = blocks.at(-1)?.split("\n") ?? [], prev = last.at(-1);
           const inList = last.some((x) => ITEM.test(x));
-          // A wrapped item carries on in lower case; "Mix the flour…" after "- 3 eggs" is the next paragraph.
-          if (prev !== undefined && (ITEM.test(l) ? inList || /:$/.test(prev) : inList && !ends(prev) && /^\p{Ll}/u.test(l))) blocks[blocks.length - 1] += `\n${l}`;
+          // A wrapped item carries on in lower case, or is followed by the next item ("…to those of /
+          // Napoleon's predecessors" / "2. …"); "Mix the flour…" after "- 3 eggs" is the next paragraph.
+          const wraps = inList && !ends(prev) && (/^\p{Ll}/u.test(l) || ITEM.test(lines[i + 1] ?? ""));
+          if (prev !== undefined && (ITEM.test(l) ? inList || /:$/.test(prev) : wraps)) blocks[blocks.length - 1] += `\n${l}`;
           else blocks.push(l);
         }
       }
