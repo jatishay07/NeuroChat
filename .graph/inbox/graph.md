@@ -13,3 +13,10 @@ Newest last. Mark handled messages `[done]`.
 - REQUEST 2026-10-27 from study-mode: tests/test_study.py's browser check skips without Node Playwright.
   In tests.yml, after pip install, please add `npm i -g playwright@1.48 && npx playwright install --with-deps chromium`
   so S5/S6 are checked in CI (it finds the global install via `npm root -g`).
+- REQUEST 2026-10-27 from reading-signals: T7 recording page needs two small touches to files you own
+  (interim), both in my T7 PR for you to accept or reject: (1) `companion/device/manager.py`: public
+  `samples_between(t0, t1) -> (times, eeg)` next to `eeg_between` (read only; a 20-minute recording
+  outlives the 180 s buffer, so the recorder copies EEG out every second with each sample's monotonic
+  time); (2) `companion/app.py`: one `app.include_router(record_router(device))` line. Everything else
+  is new and mine: `companion/session_record.py`, `portal/record.html|js|css`,
+  `tests/test_session_record.py`; contract added to CONTRACTS.md.
