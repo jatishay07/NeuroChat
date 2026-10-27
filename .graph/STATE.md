@@ -40,6 +40,18 @@ Each thread adds a `### <thread-id>` section here: current node, last handoff li
 ### graph
 - Node: Integrator. Last: `[Builder] seed CLAUDE.md + .graph → PR opened → Integrator`.
 
+### eye-tracking
+- Node: Builder (T10), idle until Atishay's accuracy numbers arrive. Retries: Tester 0/3, Reviewer 0/2.
+- Last: `[Integrator] PR #24 correction layer + follow-the-dot → merged → Builder (waiting on real accuracy)`.
+- Simulation (not a real face): correct paragraph 82% → 87% with the HMM; gaze error 70 → 48 px, 155 → 60 px after a 10 cm head move.
+- Open: real-face accuracy on the MacBook is unknown. Extension gaze paused: the offscreen document's video never gets a stream.
+- T7: ready to add a recording mode to eyes.html/eyes.js once reading-signals posts the request.
+
+### side-chat
+- Node: idle (no task). Last: `[Integrator] PR #22 per-page memory + Gemini side panel → merged → idle`.
+- Retries: none open. Waiting on: Atishay's answer on side chat outside Chrome; eye-tracking for
+  `neurochat:slow` on any page.
+
 ### engagement
 - Node: idle (T9 waits on Athena data). Last: `[Integrator] PR #25 kernel + bands + real-data check → merged → idle`.
 - Retries: none open.
