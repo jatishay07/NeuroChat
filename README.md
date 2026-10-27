@@ -161,6 +161,11 @@ python -m companion.e2e                                          # end-to-end ch
 python -m companion.e2e --ollama http://127.0.0.1:11434          # same, with the real model answering
 ```
 
+`python -m companion.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four
+people, relaxed / neutral / concentrating) and scores them. Concentrating reads above neutral for three
+of the four, and above it on held-out sessions; set `NEUROCHAT_BIRD_DATA=data/bird` to include that
+check in `pytest`.
+
 `score` reads a real recording too: Mind Monitor or muselsl CSVs (TP9, AF7, AF8, TP10 columns), NPZ,
 or XDF (with `pip install pyxdf`). Live calibration is `POST /api/engagement/calibration/relax/start`,
 then `/relax/finish`, the same for `task`; `PUT /api/engagement/calibration` sets E_min and E_max from
