@@ -80,6 +80,9 @@ try {
   await page.locator("#askInput").press("Enter");
   await page.waitForFunction(() => document.querySelectorAll("#chat .msg.tutor:not(.typing)").length === 2);
   seen.explain = explain;
+  // Reading the answer doesn't count as reading the paragraph.
+  await page.clock.fastForward(50000);
+  assert.equal(await page.evaluate(() => window.studyState().pace), explain.dwellMsPer100Words);
   if (shots) await page.screenshot({ path: `${shots}/study-explain.png`, animations: "disabled" });
 
   // Finish lists the slow paragraph.
@@ -98,6 +101,58 @@ try {
   assert.equal(s.baseline.length, 5, JSON.stringify(s));
   assert.match(await page.locator("#paceNote").textContent(), /Your usual pace: \d+ s per 100 words, from 5 paragraphs/);
   if (shots) await page.screenshot({ path: `${shots}/study-start.png`, animations: "disabled" });
+  const paced = s.baseline.find((v) => v > 40000);
+  assert.equal(paced, explain.dwellMsPer100Words, "the explained paragraph keeps its pace from before Explain");
+
+  // A second text adds to the baseline (it doesn't replace the first text's paragraphs).
+  assert.equal(await page.locator("#startBtn").isEnabled(), true);
+  await page.locator("#source").fill("A second text\n\n" + "Words to read here again and again. ".repeat(5) + "\n\n" + "More words for the next paragraph now. ".repeat(5));
+  await page.locator("#startBtn").click();
+  await page.clock.fastForward(8000);
+  await page.keyboard.press("ArrowRight");
+  assert.equal((await page.evaluate(() => window.studyState())).baseline.length, 6);
+
+  // Round-1 critique fixes, on a fresh text.
+  // Resume: reload mid-text offers to continue where you were.
+  await page.reload();
+  assert.equal(await page.locator("#resumeBtn").textContent(), "Continue at paragraph 2 of 2");
+  const tall = "Long text\n\n" + Array.from({ length: 4 }, (_, k) => `Paragraph ${k} begins. ` + "This sentence keeps going so the paragraph is tall on screen. ".repeat(14)).join("\n\n");
+  await page.locator("#source").fill(tall);
+  await page.locator("#startBtn").click();
+
+  // A trackpad flick (one gesture with ~2 s of inertia) moves one paragraph, not three.
+  await page.setViewportSize({ width: 1280, height: 1600 });
+  await page.mouse.move(600, 400);
+  for (let k = 0; k < 120; k++) { await page.mouse.wheel(0, Math.max(4, 120 * Math.exp(-k / 30))); await page.clock.fastForward(16); }
+  assert.equal((await page.evaluate(() => window.studyState())).at, 1, "one flick, one paragraph");
+  seen.flick = "120 wheel events over 2 s → 1 move";
+
+  // A paragraph taller than the window: ↓ scrolls it first and only then moves on.
+  await page.setViewportSize({ width: 390, height: 500 });
+  await page.clock.fastForward(1000);
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(400); // the browser's own smooth scroll
+  assert.equal((await page.evaluate(() => window.studyState())).at, 1, "↓ scrolled the page instead of skipping");
+  assert.ok(await page.evaluate(() => window.scrollY > 0));
+  await page.keyboard.press("End");
+  await page.waitForTimeout(400);
+  await page.keyboard.press("ArrowDown");
+  assert.equal((await page.evaluate(() => window.studyState())).at, 2);
+
+  // Explain again adds another take to the same conversation; "Got it" stays collapsed.
+  await page.getByRole("button", { name: "Explain" }).click();
+  await page.locator("#chat .msg.tutor:not(.typing)").waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement.id), "askInput", "focus moves to the follow-up box");
+  await page.getByRole("button", { name: "Explain again" }).click();
+  await page.waitForFunction(() => document.querySelectorAll("#chat .msg.tutor:not(.typing)").length === 2);
+  assert.equal(sent.filter((m) => m.type === "explain").at(-1).append, true);
+  await page.getByRole("button", { name: "Got it" }).click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowLeft");
+  assert.equal(await page.locator("#tutor").isVisible(), false, "collapsed answer stays collapsed");
+  await page.getByRole("button", { name: "Show explanation" }).click();
+  assert.equal(await page.locator("#chat .msg.tutor").count(), 2);
+  if (shots) await page.screenshot({ path: `${shots}/study-mobile.png`, animations: "disabled", fullPage: true });
 
   // S6: never asked for a camera.
   seen.cameraAsks = await page.evaluate(() => window.__cameraAsks);

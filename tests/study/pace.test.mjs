@@ -66,8 +66,35 @@ test("S4: slow means at least SLOW_RATIO times the usual pace, once there is a b
 });
 
 test("S1: pasted text splits into a title and paragraphs", () => {
-  assert.deepEqual(P.parseText("Batteries\n\nOne two.\nthree.\n\n  Four.  "), { title: "Batteries", paragraphs: ["One two. three.", "Four."] });
-  assert.deepEqual(P.parseText("First line.\nSecond line.\r\nThird line."), { title: null, paragraphs: ["First line.", "Second line.", "Third line."] });
-  assert.deepEqual(P.parseText("Just one paragraph"), { title: null, paragraphs: ["Just one paragraph"] });
-  assert.deepEqual(P.parseText("  \n "), { title: null, paragraphs: [] });
+  const t = (raw) => { const r = P.parseText(raw); return [r.title, r.paragraphs, r.headings]; };
+  assert.deepEqual(t("Batteries\n\nOne two.\nthree.\n\n  Four.  "), ["Batteries", ["One two. three.", "Four."], [null, null]]);
+  assert.deepEqual(t("First line.\nSecond line.\r\nThird line."), [null, ["First line.", "Second line.", "Third line."], [null, null, null]]);
+  assert.deepEqual(t("Just one paragraph"), [null, ["Just one paragraph"], [null]]);
+  assert.deepEqual(t("  \n "), [null, [], []]);
+});
+
+test("S1: Markdown headings, lists and quotes; headings label the paragraph under them", () => {
+  const r = P.parseText("# Cells\n\n## Membranes\n\nThe membrane is a bilayer of lipids.\n\n- lipids\n- proteins\n- sugars\n\n> A quoted line here.");
+  assert.equal(r.title, "Cells");
+  assert.deepEqual(r.paragraphs, ["The membrane is a bilayer of lipids.", "• lipids\n• proteins\n• sugars", "A quoted line here."]);
+  assert.deepEqual(r.headings, ["Membranes", null, null]);
+});
+
+test("S1: hard-wrapped text (from a PDF) is joined, and a wall of text is cut at sentence ends", () => {
+  const wrapped = "The membrane of a cell is made of two layers of lipid molecules that\nface each other so that their water loving heads point out and their\nwater fearing tails point in, which makes a barrier.";
+  assert.equal(P.parseText(wrapped).paragraphs.length, 1);
+  const wall = "This is a sentence of exactly ten words in it ok. ".repeat(60);
+  const parts = P.parseText(wall).paragraphs;
+  assert.equal(parts.length, 6);
+  assert.ok(parts.every((p) => p.endsWith("ok.") && P.words(p) <= 130));
+});
+
+test("S3: a new text adds to the baseline instead of replacing the last text's paragraphs", () => {
+  const store = memoryStorage();
+  const b = new P.Baseline(store);
+  b.record(0, 20000); b.record(1, 22000);
+  b.newSession();
+  b.record(0, 30000); b.record(1, 32000);
+  assert.equal(b.stats().samples, 4);
+  assert.equal(new P.Baseline(store).stats().samples, 4);
 });

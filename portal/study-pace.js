@@ -54,6 +54,9 @@
     record(id, value) {
       if (value) { this.session.set(id, value); this.save(); }
     }
+    // A new text: this session's paragraphs join the past ones, so paragraph 1 of the next text
+    // doesn't replace paragraph 1 of this one.
+    newSession() { this.past = this.values(); this.session.clear(); }
     values() { return this.past.concat([...this.session.values()]).slice(-KEEP); }
     // The median without paragraph `id`, so a paragraph is never compared with itself.
     stats(exceptId) {
@@ -91,16 +94,65 @@
     }
   }
 
-  // Split pasted text into a title (a short first line with no closing full stop) and paragraphs.
+  // Split pasted text into a title, paragraphs, and the heading each paragraph sits under.
+  // Handles blank-line paragraphs, one-paragraph-per-line text, hard-wrapped text (PDFs: lines
+  // broken mid-sentence), Markdown headings, quotes and lists. Very long paragraphs are cut at
+  // sentence ends, so every screenful is timed and one wall of text still builds a baseline.
+  const LONG = 180, CHUNK = 120;
+  const HEADING = /^#{1,6}\s+/, ITEM = /^\s*(?:[-*•+]|\d+[.)])\s+/;
+  const ends = (l) => /[.!?:;"”’')\]]$/.test(l);
+  // A short line not ending like a sentence ("How do batteries store energy?" is a title, "Four." is not).
+  const isHeading = (b) => HEADING.test(b) || (!b.includes("\n") && words(b) <= 10 && !/[.:;,]$/.test(b) && !ITEM.test(b));
+
+  function chunk(text) {
+    if (words(text) <= LONG) return [text];
+    const sentences = text.match(/[^.!?]+(?:[.!?]+["”’')\]]*\s*|$)/g) || [text];
+    const out = [];
+    let cur = "";
+    for (const sn of sentences) {
+      if (cur && words(cur) + words(sn) > CHUNK && words(cur) >= CHUNK / 2) { out.push(cur.trim()); cur = ""; }
+      cur += sn;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+
   function parseText(raw) {
     const text = String(raw).replace(/\r\n?/g, "\n").trim();
-    // Paragraphs are split by blank lines; text with no blank lines at all (copied from some
-    // pages) is split by line instead.
-    const blocks = (/\n\s*\n/.test(text) ? text.split(/\n\s*\n/) : text.split("\n"))
-      .map((b) => b.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+    let blocks;
+    if (/\n\s*\n/.test(text)) blocks = text.split(/\n\s*\n/);
+    else {
+      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      // One paragraph per line, unless the lines are a hard-wrapped text broken mid-sentence.
+      const whole = lines.filter((l) => ends(l) || l.length <= 60 || ITEM.test(l) || HEADING.test(l)).length;
+      blocks = lines.length > 1 && whole / lines.length < 0.6 ? [lines.join("\n")] : lines;
+    }
+    blocks = blocks.map((b) => b.split("\n").map((l) => l.trim().replace(/^>\s?/, "")).filter(Boolean).join("\n")).filter(Boolean);
+
+    const items = []; // { heading } or { text }
+    for (const b of blocks) {
+      const lines = b.split("\n");
+      if (HEADING.test(lines[0]) || (lines.length === 1 && isHeading(b))) {
+        items.push({ heading: lines[0].replace(HEADING, "").trim() });
+        lines.shift();
+        if (!lines.length) continue;
+      }
+      if (lines.every((l) => ITEM.test(l))) items.push({ text: lines.map((l) => `• ${l.replace(ITEM, "")}`).join("\n") });
+      else for (const c of chunk(lines.join(" "))) items.push({ text: c });
+    }
+    // Nothing but short lines: they're the text, not headings.
+    if (!items.some((it) => it.text !== undefined)) return { title: null, paragraphs: items.map((it) => it.heading), headings: items.map(() => null) };
     let title = null;
-    if (blocks.length > 1 && blocks[0].length <= 90 && !/[.:;,]$/.test(blocks[0])) title = blocks.shift();
-    return { title, paragraphs: blocks };
+    if (items.length > 1 && items[0].heading !== undefined) title = items.shift().heading;
+    const paragraphs = [], headings = [];
+    let pending = null;
+    for (const it of items) {
+      if (it.heading !== undefined) { pending = it.heading; continue; }
+      paragraphs.push(it.text);
+      headings.push(pending);
+      pending = null;
+    }
+    return { title, paragraphs, headings };
   }
 
   return { KEY, SLOW_RATIO, MIN_SAMPLES, MIN_WORDS, IDLE_MS, words, msPer100Words, median, isSlow, Baseline, Clock, parseText };
