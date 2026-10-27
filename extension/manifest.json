@@ -14,11 +14,19 @@
     "js": ["content.js"],
     "css": ["content.css"],
     "run_at": "document_idle"
+  }, {
+    "matches": ["<all_urls>"],
+    "js": ["study/study-pace.js", "study/study-content.js"],
+    "run_at": "document_idle"
   }],
   "commands": {
     "explain-selection": {
       "suggested_key": { "default": "Alt+Shift+E" },
       "description": "Explain the selected text in the side chat"
+    },
+    "study-page": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Study mode on this page: light the paragraph you're reading and notice the slow ones"
     }
   }
 }

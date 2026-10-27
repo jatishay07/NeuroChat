@@ -2,10 +2,12 @@
 // The side panel does the talking to the companion app; this only routes requests to it.
 
 const MENU_ID = "neurochat-explain";
+const STUDY_ID = "neurochat-study"; // study mode on the page (study/study-content.js)
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   chrome.contextMenus.create({ id: MENU_ID, title: "Explain with NeuroChat", contexts: ["selection"] });
+  chrome.contextMenus.create({ id: STUDY_ID, title: "Study this page with NeuroChat", contexts: ["page"] });
 });
 
 // Hand a request to the side panel through session storage, so it arrives whether the panel
@@ -20,7 +22,13 @@ function openPanel(tab) {
   return chrome.sidePanel.open({ tabId: tab.id }).catch(() => chrome.sidePanel.open({ windowId: tab.windowId }));
 }
 
+// Study mode is switched on and off in the page itself.
+function toggleStudy(tab) {
+  return chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" }).catch(() => {});
+}
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === STUDY_ID && tab) { toggleStudy(tab); return; }
   if (info.menuItemId !== MENU_ID || !tab) return;
   openPanel(tab);
   // The menu only gives the selected text; ask the page for the paragraph around it.
@@ -30,6 +38,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
+  if (command === "study-page" && tab) { toggleStudy(tab); return; }
   if (command !== "explain-selection" || !tab) return;
   openPanel(tab);
   chrome.tabs.sendMessage(tab.id, { type: "neurochat:selection" })

@@ -204,6 +204,9 @@ async function explain(req) {
   const append = conv.messages.length > 0;
   if (!append) conv.mode = "explain";
   const msg = { type: "explain", paragraph: req.text, context: req.context, title: req.title, rereads: req.rereads, append };
+  // Study mode's pace numbers (study/study-content.js), so the tutor can pitch the explanation.
+  if (req.dwellMsPer100Words) msg.dwellMsPer100Words = req.dwellMsPer100Words;
+  if (req.medianMsPer100Words) msg.medianMsPer100Words = req.medianMsPer100Words;
   // What the companion builds from this; kept here so the conversation can be restored later.
   const content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
     (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "");

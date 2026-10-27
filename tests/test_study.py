@@ -93,3 +93,26 @@ def test_study_mode_in_a_browser(tmp_path):
     assert "their usual pace" in system and "2.2×" in system
     assert "When you plug your phone in" in explain["messages"][-1]["content"]
     assert follow_up["messages"][-1]["content"] == "What is graphite?"
+
+
+def test_extension_uses_the_same_pace_engine():
+    # The extension folder is loaded on its own, so it carries a copy; keep the two identical.
+    assert (ROOT / "extension/study/study-pace.js").read_text() == (ROOT / "portal/study-pace.js").read_text()
+
+
+@pytest.mark.skipif(not _has_playwright(), reason="needs Node and Playwright with Chromium")
+def test_study_mode_in_the_extension_on_a_news_page():
+    import functools
+    import http.server
+
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(ROOT / "tests/study/fixtures"))
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{httpd.server_address[1]}/article.html"
+        r = subprocess.run([NODE, "tests/study/extension.mjs", url], cwd=ROOT, capture_output=True, text=True,
+                           timeout=180, env={**os.environ, "NODE_PATH": _node_path()})
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert json.loads(r.stdout.strip().splitlines()[-1])["ok"]
+    finally:
+        httpd.shutdown()
