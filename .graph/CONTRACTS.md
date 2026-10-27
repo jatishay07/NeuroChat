@@ -5,7 +5,7 @@ thread in its "Used by" column. Source of truth is the code; this file says who 
 
 ## WebSocket (companion, 127.0.0.1:8765)
 
-### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, study mode (planned)
+### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, portal/study.js (study mode; sends `index`, `title`, `dwellMsPer100Words`, `medianMsPer100Words`, `rereads`; `load` to resume a paragraph's conversation)
 Client → server:
 - `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?}`
 - `{"type":"ask","text"}`
