@@ -119,3 +119,13 @@ test("S2 (round 2): Chinese and Japanese are timed by characters and cut at 。"
   const parts = P.parseText(zh).paragraphs;
   assert.ok(parts.length > 1 && parts.every((p) => p.endsWith("。")), parts.length);
 });
+
+test("S1 (round 3): one newline between paragraphs with short labels; lists without blank lines; CJK line joins", () => {
+  const doc = P.parseText("Title of doc\nHistory\nThe company was founded in 1990 by two engineers who wanted better batteries.\nEarly years\nIt grew slowly at first, selling to labs.\nToday\nIt makes cells for phones.");
+  assert.equal(doc.title, "Title of doc");
+  assert.deepEqual(doc.headings, ["History", "Early years", "Today"]);
+  assert.equal(doc.paragraphs.length, 3);
+  assert.deepEqual(P.parseText("Do this:\n1. Weigh it.\n2. Log it.\nThen stop here.").paragraphs, ["Do this:\n1. Weigh it.\n2. Log it.", "Then stop here."]);
+  assert.deepEqual(P.parseText("Intro line here.\n\n- first item that\n  wraps onto a line\n- second").paragraphs, ["Intro line here.", "• first item that wraps onto a line\n• second"]);
+  assert.equal(P.parseText("电池是一个小型化学工厂，在充\n电时反向运行，然后再次放电，一直循环下去").paragraphs[0].includes("充电"), true);
+});

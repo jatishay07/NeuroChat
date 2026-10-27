@@ -113,6 +113,9 @@
   const isHeading = (b, first) => HEADING.test(b) || (!b.includes("\n") && words(b) <= 10 && !ITEM.test(b)
     && !(first ? /[.:;,。]$/ : /[.:;,!?。！？]$/).test(b));
 
+  // Join a broken line back up: with a space, except between two Chinese/Japanese characters.
+  const join = (a, b) => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u.test(a) && /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(b) ? a + b : `${a} ${b}`;
+
   function chunk(text) {
     if (words(text) <= LONG) return [text];
     const sentences = text.match(/[^.!?。！？]+(?:[.!?。！？]+["”’')\]」』]*\s*|$)/g) || [text];
@@ -134,8 +137,19 @@
       const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
       // One paragraph per line, unless the lines are a hard-wrapped text broken mid-sentence.
       // Decided by how lines end, not how long they are: narrow PDF columns are short but end mid-sentence.
-      const whole = lines.filter((l) => ends(l) || ITEM.test(l) || HEADING.test(l)).length;
-      blocks = lines.length > 1 && whole / lines.length < 0.6 ? [lines.join("\n")] : lines;
+      // A short line right after a finished sentence is a label ("Early years"), not a broken line.
+      const whole = lines.filter((l, i) => ends(l) || ITEM.test(l) || HEADING.test(l)
+        || (words(l) <= 10 && !/,$/.test(l) && (i === 0 || ends(lines[i - 1])))).length;
+      if (lines.length > 1 && whole / lines.length < 0.6) blocks = [lines.join("\n")];
+      else {
+        // One block per line, except that a list (and the "Steps:" line that leads into it) stays together.
+        blocks = [];
+        for (const l of lines) {
+          const prev = blocks.at(-1)?.split("\n").at(-1);
+          if (ITEM.test(l) && prev !== undefined && (ITEM.test(prev) || /:$/.test(prev))) blocks[blocks.length - 1] += `\n${l}`;
+          else blocks.push(l);
+        }
+      }
     }
     blocks = blocks.map((b) => b.split("\n").map((l) => l.trim().replace(/^>\s?/, "")).filter(Boolean).join("\n")).filter(Boolean);
 
@@ -147,11 +161,17 @@
         lines.shift();
         if (!lines.length) continue;
       }
-      // A list, maybe with its lead-in line ("Steps:"), keeps one item per line.
-      if (lines.length > 1 && lines.slice(1).every((l) => ITEM.test(l))) {
-        items.push({ text: [ITEM.test(lines[0]) ? bullet(lines[0]) : lines[0], ...lines.slice(1).map(bullet)].join("\n") });
-      } else if (lines.length === 1 && ITEM.test(lines[0])) items.push({ text: bullet(lines[0]) });
-      else for (const c of chunk(lines.join(" "))) items.push({ text: c });
+      // A list, maybe with its lead-in line ("Steps:"), keeps one item per line; an item that wraps
+      // onto the next line is joined back up.
+      const first = ITEM.test(lines[0]) ? 0 : 1;
+      if (lines.length > first && ITEM.test(lines[first] ?? "")) {
+        const out = first ? [lines[0]] : [];
+        for (const l of lines.slice(first)) {
+          if (ITEM.test(l)) out.push(bullet(l));
+          else out[out.length - 1] = join(out[out.length - 1], l);
+        }
+        items.push({ text: out.join("\n") });
+      } else for (const c of chunk(lines.reduce(join))) items.push({ text: c });
     }
     // Nothing but short lines: they're the text, not headings.
     if (!items.some((it) => it.text !== undefined)) return { title: null, paragraphs: items.map((it) => it.heading), headings: items.map(() => null) };

@@ -195,9 +195,11 @@ Batteries wear out because every trip back and forth slightly damages the materi
     wheel += delta;
     if (Math.abs(wheel) < PULL) return;
     moved = true;
-    go(at + (wheel > 0 ? 1 : -1));
+    const down = wheel > 0;
+    wheel = 0; // a turn uses up the pull
+    go(at + (down ? 1 : -1));
   }
-  window.addEventListener("wheel", (e) => { if (!e.target.closest?.(".chat")) nudge(e.deltaY); }, { passive: true });
+  window.addEventListener("wheel", (e) => nudge(e.deltaY), { passive: true });
   let touchY = null;
   let touchEdges = null;
   window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; touchEdges = [atEdge(false), atEdge(true)]; }, { passive: true });
@@ -278,7 +280,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     $("tutor").hidden = !p.chat.length || p.collapsed;
     $("askForm").hidden = busy || !p.chat.some((m) => m.role === "assistant" && !m.error);
     // Explain asks once; with an answer open it asks for another take; after "Got it" it shows the answer again.
-    const answered = p.chat.some((m) => m.role === "assistant" && !m.error);
+    const answered = p.chat.some((m) => m.role === "assistant" && !m.error && m !== current?.msg);
     $("explainBtn").textContent = !p.chat.length ? "Explain" : !answered ? "Try again" : p.collapsed ? "Show explanation" : "Explain again";
   }
 

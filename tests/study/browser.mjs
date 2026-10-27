@@ -89,9 +89,13 @@ try {
   if (shots) await page.screenshot({ path: `${shots}/study-explain.png`, animations: "disabled" });
 
   // Finish lists the slow paragraph.
-  await page.keyboard.press("Escape");
-  await page.locator("body").click({ position: { x: 5, y: 300 } });
-  await page.getByRole("button", { name: "Next paragraph" }).click();
+  // Wheel with the pointer over the answer, at the bottom of the page, still turns the page.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.locator("#chat .msg.tutor").first().hover();
+  await page.clock.fastForward(1500);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(100);
+  assert.equal((await page.evaluate(() => window.studyState())).at, 4, "wheel over the explanation turns the page");
   await read(4);
   await page.getByRole("button", { name: "Next paragraph" }).click();
   assert.equal(await page.locator("#finish").isVisible(), true);
@@ -141,6 +145,10 @@ try {
   await page.mouse.wheel(0, 100);
   await page.waitForTimeout(100);
   assert.equal((await page.evaluate(() => window.studyState())).at, 2, "two notches turn the page");
+  await page.clock.fastForward(400);
+  await page.mouse.wheel(0, 100);
+  await page.waitForTimeout(100);
+  assert.equal((await page.evaluate(() => window.studyState())).at, 2, "a turn uses up the pull: the next notch alone doesn't turn");
   await page.keyboard.press("ArrowLeft");
 
   // A paragraph taller than the window: ↓ scrolls it first and only then moves on.
