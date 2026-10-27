@@ -35,6 +35,7 @@ def main() -> None:
         level = min(max(float(args.engagement), 0.0), 1.0)
     backend = SimulatedBackend(bad_channel=args.bad_channel, engagement=level) if args.simulate else MuseBackend()
     print(f"Portal: http://127.0.0.1:{args.port}")
+    print(f"Study mode (no headset needed): http://127.0.0.1:{args.port}/study.html")
     # Short graceful shutdown: the portal keeps a WebSocket open, which would otherwise make Ctrl+C
     # hang. Closing that socket on the way out is expected, so don't log it as an error.
     logging.getLogger("uvicorn.error").addFilter(
