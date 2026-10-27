@@ -1,14 +1,15 @@
 # STATE
 
 First thing every node reads. Only the Integrator edits it; threads report in `.graph/threads/<id>.md`.
-Last updated: 2026-10-27 23:30Z by graph (Integrator).
+Last updated: 2026-10-27 23:55Z by graph (Integrator).
 
 ## Project
 
-- **Current milestone:** 1, study mode: first version merged (#33). The study-mode thread is running a
-  critique loop Atishay asked for; its fixes (from 538965e) come as a follow-up PR. Milestone 2: T4 and T7 merged.
-- **main:** merged today #26, #28–#34. Open: #27 public-repo (green, held until Atishay picks a license).
-- **Last full suite:** 2026-10-27 on #34's merge head `8afe5eb`: `pytest -q` → 74 passed, 1 skipped,
+- **Current milestone:** 1, study mode: shipped (#33, critique-loop fixes #37). Next from study-mode:
+  study mode inside the Chrome extension (with side-chat's notes). Milestone 2: T4, T7 and the T5 report
+  runner (#36) merged; T5 itself waits on the dataset.
+- **main:** merged today #26, #28–#37. Open: #27 public-repo (green, held until Atishay picks a license).
+- **Last full suite:** 2026-10-27 on #37's merge (main + f781dca): `pytest -q` → 75 passed, 1 skipped,
   study-mode browser check included; Docker build + real-Qwen smoke green in CI.
 - **Blocked:** Phase 1 data. Zenodo is blocked from cloud sessions; Atishay is uploading `csv_raw.zip`
   (228 MB) to the project files. Not there yet as of 2026-10-27 22:30Z.
@@ -17,11 +18,11 @@ Last updated: 2026-10-27 23:30Z by graph (Integrator).
 
 | id | task | milestone | owner | status | depends on |
 |---|---|---|---|---|---|
-| T1 | Study mode reader page (S1–S7) | 1 | study-mode | merged #33; critique fixes pending | — |
+| T1 | Study mode reader page (S1–S7) | 1 | study-mode | merged #33 + #37 | — |
 | T2 | Personal pace baseline + slow cue (S2–S4) | 1 | study-mode | merged #33 | T1 |
 | T3 | Wire study mode into home, `neurochat`, Docker (S8) | 1 | study-mode | merged #33 | T1 |
 | T4 | Eye-movement detectors (P1) | 2 | reading-signals | merged #32 | — |
-| T5 | Score on Afonso & Heinrichs data (P2, P3) | 2 | reading-signals | blocked: data upload | T4 |
+| T5 | Score on Afonso & Heinrichs data (P2, P3) | 2 | reading-signals | runner merged #36; blocked: data upload | T4 |
 | T6 | Go/stop decision (P4) | 2 | reading-signals → Atishay | todo | T5 |
 | T7 | Recording page for Phase 2 (portal/record.html, /ws/record) | 2 | reading-signals | merged #34 | before next week's recording |
 | T8 | Portal calibration screen for the engagement kernel | side | unassigned | todo | — |
