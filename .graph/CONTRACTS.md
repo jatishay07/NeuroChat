@@ -5,7 +5,7 @@ thread in its "Used by" column. Source of truth is the code; this file says who 
 
 ## WebSocket (companion, 127.0.0.1:8765)
 
-### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, study mode (planned)
+### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, portal/study.js (study mode; sends `index`, `title`, `dwellMsPer100Words`, `medianMsPer100Words`, `rereads`; `load` to resume a paragraph's conversation)
 Client → server:
 - `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?}`
 - `{"type":"ask","text"}`
@@ -30,6 +30,15 @@ Server → client, on every change: `{"state","error","devices":[...],"device","
 HTTP: `GET /api/device`, `POST /api/device/scan?timeout=`, `POST /api/device/connect {address}`,
 `POST /api/device/disconnect`.
 
+### /ws/record — owner: reading-signals · used by: portal record.js
+Client → server while recording: any JSON object with a string `"type"`; record.js sends `step`
+`{name, state:start|end}`, `dot {x_deg, x_px}`, `cue {what:blink|clench}`, `paragraph {state:show|hide,
+block, index, n, lines?, window?}`, `script`, `explain {block, index, n, line, on}`, `rating {block,
+index, n, value:easy|ok|hard}`, each with `client_ms`. Server → client: `{"type":"ok","t"}` (seconds on
+the eeg.csv clock) or `{"type":"error","message"}`. HTTP: `GET /api/record`, `POST /api/record/start
+{screen_mm, screen_px, distance_mm, easy, hard, ...}` (409 if running), `POST /api/record/stop` →
+summary (409 if not). Files: `data/sessions/<id>/` (or `$NEUROCHAT_DATA/sessions/`), never committed.
+
 ## HTTP
 
 - Engagement — owner: engagement · used by: tutor, (planned) calibration screen:
@@ -45,6 +54,11 @@ HTTP: `GET /api/device`, `POST /api/device/scan?timeout=`, `POST /api/device/con
   `detail` = `{index, text, dwellMsPer100Words, rereads, element}`.
 
 ## Python
+
+- `DeviceManager.samples_between(t0, t1) -> (monotonic times, ch×samples)`, samples after t0 — owner:
+  graph (interim) · used by: reading-signals (session_record.py).
+- `companion.eyemove.detect(eeg, srate, gain_uv_per_deg=None) -> EyeEvents` (saccades, blinks,
+  clenches) — owner: reading-signals.
 
 - `engagement_index(eeg: ch×samples µV, srate) -> float | None` — owner: engagement · used by:
   tutor, gaze, reading-signals (filtering, read only).

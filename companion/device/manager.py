@@ -169,6 +169,14 @@ class DeviceManager:
         keep = (times >= t0) & (times <= t1)
         return self._buffer[:, start:][:, keep]
 
+    def samples_between(self, t0: float, t1: float) -> tuple[np.ndarray, np.ndarray]:
+        """Like eeg_between, with each sample's time.monotonic() arrival time: (times, channels × samples).
+        Only samples after t0 (exclusive), so successive calls don't repeat one."""
+        start = self._buffer.shape[1] - self._filled
+        times = self._times[start:]
+        keep = (times > t0) & (times <= t1)
+        return times[keep].copy(), self._buffer[:, start:][:, keep].copy()
+
     def wave(self) -> list[list[float]]:
         """The last few seconds per channel, averaged down to WAVE_POINTS, mean removed, in µV."""
         w = self.window(WAVE_SECONDS)
