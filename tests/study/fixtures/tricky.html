@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Docs: storing energy · Example Docs</title>
+  <!-- A made-up docs site with the shapes real pages have: a promo <article> first, a panel that
+       scrolls instead of the window, a search box inside a web component, a definition list,
+       a references list, a table, and paragraphs that load as you scroll. -->
+  <style>
+    html, body { margin: 0; height: 100%; font: 18px/1.7 system-ui, sans-serif; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; height: 100%; }
+    .side { border-right: 1px solid #eee; padding: 16px; font-size: 14px; }
+    #content { overflow-y: auto; padding: 24px 40px 400px; }
+    .promo { border: 1px solid #eee; padding: 8px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="side"><search-box></search-box><p>Menu</p></div>
+    <div id="content">
+      <article class="promo"><p>Try our new course on electrochemistry today and get the first module free for a month.</p></article>
+      <main>
+        <h1>Storing energy</h1>
+        <p>Docs paragraph one explains that a battery keeps energy as chemical potential between two different materials.</p>
+        <p>Docs paragraph two says that charging pushes lithium ions back into the graphite, where they wait between its layers.</p>
+        <dl><dt>Anode</dt><dd><p>The side of the cell that gives up electrons while the battery powers a device.</p></dd></dl>
+        <table><tr><td>Voltage of a typical lithium ion cell in a phone is around three point seven volts</td></tr></table>
+        <p>Docs paragraph three covers how heat speeds up the reactions that slowly trap lithium and age the cell.</p>
+        <p>Docs paragraph four describes why phones slow their charging down once the battery is mostly full.</p>
+        <p>Docs paragraph five lists the newer materials, like silicon anodes, that researchers hope will crack less.</p>
+        <ol class="references"><li>Example reference one, a textbook on electrochemistry, chapter four, pages ten to twenty.</li></ol>
+        <div id="more"></div>
+      </main>
+    </div>
+  </div>
+  <script>
+    customElements.define("search-box", class extends HTMLElement {
+      connectedCallback() { this.attachShadow({ mode: "open" }).innerHTML = '<input id="q" placeholder="Search">'; }
+    });
+    let n = 6;
+    document.getElementById("content").addEventListener("scroll", (e) => {
+      const c = e.target;
+      if (c.scrollTop + c.clientHeight > c.scrollHeight - 300 && n < 10) {
+        const p = document.createElement("p");
+        p.textContent = `Docs paragraph ${n++} arrived while scrolling, the way a long page loads more as you read it.`;
+        document.getElementById("more").append(p);
+      }
+    });
+  </script>
+</body>
+</html>

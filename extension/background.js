@@ -22,9 +22,16 @@ function openPanel(tab) {
   return chrome.sidePanel.open({ tabId: tab.id }).catch(() => chrome.sidePanel.open({ windowId: tab.windowId }));
 }
 
-// Study mode is switched on and off in the page itself.
-function toggleStudy(tab) {
-  return chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" }).catch(() => {});
+// Study mode is switched on and off in the page itself. Tabs opened before the extension was
+// installed or updated don't have its script yet, so put it there first.
+async function toggleStudy(tab) {
+  const toggle = () => chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" });
+  try { await toggle(); } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["study/study-pace.js", "study/study-content.js"] });
+      await toggle();
+    } catch { /* a page extensions can't touch, such as chrome:// or the Web Store */ }
+  }
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {

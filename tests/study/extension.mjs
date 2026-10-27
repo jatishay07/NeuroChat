@@ -19,8 +19,8 @@ const context = await chromium.launchPersistentContext("", {
 const seen = {};
 try {
   const sw = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
-  // A usual pace of 3 s per 100 words, from 10 paragraphs.
-  await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.pace.v1": JSON.stringify(Array(10).fill(3000)) }));
+  // A usual pace of 3 s per 100 words, from 10 earlier paragraphs.
+  await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.samples.v1": JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ k: `seed${i}`, v: 3000 }))) }));
   const page = await context.newPage();
   await page.goto(url);
   const study = () => sw.evaluate(async () => {
@@ -82,11 +82,44 @@ try {
   // Leaving a paragraph adds it to the shared baseline; Esc turns study mode off and cleans up.
   await page.keyboard.press("j");
   await page.waitForFunction(() => /^When you plug/.test(document.querySelector(".neurochat-current")?.textContent));
-  const stored = await sw.evaluate(async () => JSON.parse((await chrome.storage.local.get("neurochat.study.pace.v1"))["neurochat.study.pace.v1"]));
+  const stored = await sw.evaluate(async () => JSON.parse((await chrome.storage.local.get("neurochat.study.samples.v1"))["neurochat.study.samples.v1"]));
   assert.ok(stored.length >= 11, `baseline grew: ${stored.length}`);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study, neurochat-study").count(), 0);
   seen.cleanup = "Esc removes every trace";
+
+  // Turning it off and on again on the same page doesn't count a paragraph twice.
+  await study(); await page.waitForTimeout(300); await study();
+  const again = await sw.evaluate(async () => JSON.parse((await chrome.storage.local.get("neurochat.study.samples.v1"))["neurochat.study.samples.v1"]));
+  assert.equal(new Set(again.map((x) => x.k)).size, again.length, "one reading per paragraph");
+
+  // Real-site shapes (fixtures/tricky.html).
+  await page.goto(new URL("tricky.html", url).href);
+  const t = await study();
+  assert.equal(t.paragraphs, 6, "the main text: not the promo card, table, reference, or the dd's inner p twice");
+  assert.equal(await page.locator("dd.neurochat-dim p.neurochat-dim, dd p.neurochat-current").count(), 0, "no nested paragraph is dimmed separately");
+  // Typing j in a search box inside a web component types; it doesn't move the light or exit.
+  await page.locator("search-box input").click();
+  await page.keyboard.type("jk");
+  assert.equal(await page.locator("search-box input").inputValue(), "jk");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("html.neurochat-study").count(), 1, "Esc in a text box doesn't turn study mode off");
+  // The text scrolls inside a panel: the light follows it, and new paragraphs join as they load.
+  await page.locator("#content").click({ position: { x: 600, y: 10 } });
+  await page.mouse.move(700, 400);
+  for (let k = 0; k < 8; k++) { await page.mouse.wheel(0, 250); await page.waitForTimeout(80); }
+  await page.waitForTimeout(700);
+  const after = await page.evaluate(() => [document.querySelectorAll(".neurochat-dim, .neurochat-current").length, document.querySelector(".neurochat-current")?.textContent.slice(0, 22)]);
+  assert.ok(after[0] > 6, `paragraphs that loaded later joined: ${after[0]}`);
+  assert.ok(after[1] && !/^Docs paragraph one/.test(after[1]), `the light followed the panel: ${after[1]}`);
+  await page.keyboard.press("Escape");
+  seen.realSites = "promo card, panel scrolling, late paragraphs, web-component input, dd>p, references, table";
+
+  // A page with nothing to study says so instead of doing nothing.
+  await page.goto(new URL("empty.html", url).href);
+  assert.deepEqual(await study(), { on: false, paragraphs: 0 });
+  await page.waitForFunction(() => document.querySelector("neurochat-study"));
+  seen.empty = "says there's nothing to study";
   console.log(JSON.stringify({ ok: true, ...seen }));
 } finally {
   await context.close();
