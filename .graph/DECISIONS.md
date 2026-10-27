@@ -17,3 +17,4 @@ date | node | decision | why | alternatives rejected
 2026-10-27 | Planner | Phase 1 data: Atishay downloads csv_raw.zip from Zenodo 14860668 and uploads it | Zenodo blocked from the sandbox | GitHub Actions download
 2026-10-27 | Planner | Adopt the graph engineering contract (CLAUDE.md, .graph/) for every thread; Integrator = graph thread | Atishay asked for looped build→test→iterate and inter-thread messaging | ad-hoc ownership via memory only
 2026-10-27 | Integrator | .graph/ and CLAUDE.md carry no personal facts from the brain vault; refer to "the owner's notes" | repo is going public (public-repo thread) | copying vault facts into the repo
+2026-10-27 | Integrator | Per-thread files .graph/threads/<id>.md replace thread rows in THREADS.md and sections in STATE.md; Integrator owns STATE/THREADS | the first three registrations (#28–#30) all conflicted on adjacent lines of the same two files | keep shared files and resolve conflicts on every merge
