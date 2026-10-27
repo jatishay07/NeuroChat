@@ -25,7 +25,7 @@ from .synthetic import synthetic_eeg
 
 VIEW_DISTANCE_MM = 600.0       # the dataset's viewing distance (about 60 cm)
 JUMP_MIN_MM = 5.0              # stimulus moves smaller than this aren't jumps
-MATCH_WINDOW_S = (0.05, 0.7)   # a detected saccade answers a jump 50–700 ms after it
+MATCH_WINDOW_S = (-0.05, 0.7)  # a saccade answers a jump up to 700 ms later (onset estimates are ±20 ms)
 
 
 # ---- synthetic -----------------------------------------------------------------------------------
