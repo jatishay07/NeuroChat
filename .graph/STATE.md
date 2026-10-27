@@ -1,14 +1,15 @@
 # STATE
 
-First thing every node reads. Each thread edits only its own section; Integrator edits "Project".
-Last updated: 2026-10-27 23:00Z by graph (Integrator).
+First thing every node reads. Only the Integrator edits it; threads report in `.graph/threads/<id>.md`.
+Last updated: 2026-10-27 23:30Z by graph (Integrator).
 
 ## Project
 
-- **Current milestone:** 1, study mode, owned by the `study-mode` thread ("Build study mode", started 2026-10-27).
-- **main:** registrations merged (#26, #28, #29, #30). Open: #27 public-repo (held until Atishay picks a license).
-- **Last full suite:** 2026-10-27 on `8c81218`: `pytest -q` → 52 passed, 1 skipped (71 s). Docker CI
-  last green on PR #25.
+- **Current milestone:** 1, study mode: first version merged (#33). The study-mode thread is running a
+  critique loop Atishay asked for; its fixes (from 538965e) come as a follow-up PR. Milestone 2: T4 and T7 merged.
+- **main:** merged today #26, #28–#34. Open: #27 public-repo (green, held until Atishay picks a license).
+- **Last full suite:** 2026-10-27 on #34's merge head `8afe5eb`: `pytest -q` → 74 passed, 1 skipped,
+  study-mode browser check included; Docker build + real-Qwen smoke green in CI.
 - **Blocked:** Phase 1 data. Zenodo is blocked from cloud sessions; Atishay is uploading `csv_raw.zip`
   (228 MB) to the project files. Not there yet as of 2026-10-27 22:30Z.
 
@@ -16,13 +17,13 @@ Last updated: 2026-10-27 23:00Z by graph (Integrator).
 
 | id | task | milestone | owner | status | depends on |
 |---|---|---|---|---|---|
-| T1 | Study mode reader page (S1–S7) | 1 | study-mode | todo | — |
-| T2 | Personal pace baseline + slow cue (S2–S4) | 1 | with T1 | todo | T1 |
-| T3 | Wire study mode into home, `neurochat`, Docker (S8) | 1 | study-mode | todo | T1 |
-| T4 | Eye-movement detectors (P1) | 2 | reading-signals | in progress | — |
+| T1 | Study mode reader page (S1–S7) | 1 | study-mode | merged #33; critique fixes pending | — |
+| T2 | Personal pace baseline + slow cue (S2–S4) | 1 | study-mode | merged #33 | T1 |
+| T3 | Wire study mode into home, `neurochat`, Docker (S8) | 1 | study-mode | merged #33 | T1 |
+| T4 | Eye-movement detectors (P1) | 2 | reading-signals | merged #32 | — |
 | T5 | Score on Afonso & Heinrichs data (P2, P3) | 2 | reading-signals | blocked: data upload | T4 |
 | T6 | Go/stop decision (P4) | 2 | reading-signals → Atishay | todo | T5 |
-| T7 | Recording mode for Phase 2 (needs eyes.html/eyes.js) | 2 | reading-signals + eye-tracking | todo | before next week's recording |
+| T7 | Recording page for Phase 2 (portal/record.html, /ws/record) | 2 | reading-signals | merged #34 | before next week's recording |
 | T8 | Portal calibration screen for the engagement kernel | side | unassigned | todo | — |
 | T9 | Tune engagement band edges on real Athena data | side | engagement | waiting: Athena data | — |
 | T10 | Make webcam gaze usable (Atishay: "still not great or usable", 2026-10-26) | side | eye-tracking | in progress | his accuracy numbers |

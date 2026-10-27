@@ -2,3 +2,7 @@
 *.sh text eol=lf
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
+# .graph files that threads only append to: a local merge keeps both sides instead of conflicting.
+.graph/DECISIONS.md merge=union
+.graph/TESTS.md merge=union
+.graph/inbox/*.md merge=union
