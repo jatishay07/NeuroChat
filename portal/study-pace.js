@@ -144,9 +144,11 @@
       else {
         // One block per line, except that a list (and the "Steps:" line that leads into it) stays together.
         blocks = [];
+        // A list item that wraps onto the next line carries on in the same block too.
         for (const l of lines) {
-          const prev = blocks.at(-1)?.split("\n").at(-1);
-          if (ITEM.test(l) && prev !== undefined && (ITEM.test(prev) || /:$/.test(prev))) blocks[blocks.length - 1] += `\n${l}`;
+          const last = blocks.at(-1)?.split("\n") ?? [], prev = last.at(-1);
+          const inList = last.some((x) => ITEM.test(x));
+          if (prev !== undefined && (ITEM.test(l) ? inList || /:$/.test(prev) : inList && !ends(prev))) blocks[blocks.length - 1] += `\n${l}`;
           else blocks.push(l);
         }
       }
@@ -156,7 +158,9 @@
     const items = []; // { heading } or { text }
     for (const b of blocks) {
       const lines = b.split("\n");
-      if (HEADING.test(lines[0]) || (lines.length === 1 && isHeading(b, !items.length))) {
+      // A label: a Markdown heading, a short line on its own, or a short line sitting right above a
+      // much longer one ("History" over its paragraph; a hard-wrapped line is as long as the next).
+      if (HEADING.test(lines[0]) || (isHeading(lines[0], !items.length) && (lines.length === 1 || words(lines[0]) * 2 <= words(lines[1])))) {
         items.push({ heading: lines[0].replace(HEADING, "").trim() });
         lines.shift();
         if (!lines.length) continue;
@@ -186,6 +190,9 @@
         pending = it.heading;
         continue;
       }
+      // A label mid-text needs a paragraph clearly longer than itself; otherwise (a line of a poem)
+      // it's text.
+      if (pending !== null && paragraphs.length && words(it.text) < 2 * words(pending)) { paragraphs.push(pending); headings.push(null); pending = null; }
       paragraphs.push(it.text);
       headings.push(pending);
       pending = null;

@@ -129,3 +129,15 @@ test("S1 (round 3): one newline between paragraphs with short labels; lists with
   assert.deepEqual(P.parseText("Intro line here.\n\n- first item that\n  wraps onto a line\n- second").paragraphs, ["Intro line here.", "• first item that wraps onto a line\n• second"]);
   assert.equal(P.parseText("电池是一个小型化学工厂，在充\n电时反向运行，然后再次放电，一直循环下去").paragraphs[0].includes("充电"), true);
 });
+
+test("S1 (round 4): wrapped numbered items, labels above their text, poems", () => {
+  const book = P.parseText("Chapter 4: Photosynthesis\nPlants convert light into sugar inside their chloroplasts.\nThe main stages are:\n1. Light absorption by chlorophyll in the thylakoid\nmembranes.\n2. Splitting of water.\n3. The Calvin cycle.");
+  assert.deepEqual(book.paragraphs.at(-1), "The main stages are:\n1. Light absorption by chlorophyll in the thylakoid membranes.\n2. Splitting of water.\n3. The Calvin cycle.");
+  const wiki = P.parseText("Batteries\n\nHistory\nResearch on rechargeable cells began in the 1850s with lead and acid.\n\nDesign\nGenerally a cell has two electrodes and an electrolyte between them.");
+  assert.deepEqual(wiki.headings, ["History", "Design"]);
+  assert.match(wiki.paragraphs[0], /^Research on/);
+  const poem = P.parseText("Fire and Ice\nSome say the world will end in fire,\nSome say in ice.\nFrom what I've tasted of desire\nI hold with those who favor fire.");
+  assert.equal(poem.title, "Fire and Ice");
+  assert.ok(poem.headings.every((h) => h === null), JSON.stringify(poem));
+  assert.equal(poem.paragraphs.map(P.words).reduce((a, b) => a + b), 25, "no words lost");
+});

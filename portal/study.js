@@ -281,7 +281,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     $("askForm").hidden = busy || !p.chat.some((m) => m.role === "assistant" && !m.error);
     // Explain asks once; with an answer open it asks for another take; after "Got it" it shows the answer again.
     const answered = p.chat.some((m) => m.role === "assistant" && !m.error && m !== current?.msg);
-    $("explainBtn").textContent = !p.chat.length ? "Explain" : !answered ? "Try again" : p.collapsed ? "Show explanation" : "Explain again";
+    $("explainBtn").textContent = !p.chat.length || (!answered && current?.para === p) ? "Explain" : !answered ? "Try again" : p.collapsed ? "Show explanation" : "Explain again";
   }
 
   // As the answer grows, follow it like a chat does, keeping its bottom (and the follow-up box)
