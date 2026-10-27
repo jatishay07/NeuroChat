@@ -6,6 +6,7 @@ extension use the same endpoints.
 from __future__ import annotations
 
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .device import Backend, BackendError, BrowserHeadset, DeviceManager
+from .engagement import CalibrationError, LiveEngagement
 from .gaze import GazeSession, visit_json
 from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request, reader_notes
 from .webui import WebUI, WebUIError
@@ -25,6 +27,11 @@ PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
 
 class ConnectRequest(BaseModel):
     address: str
+
+
+class CalibrationValues(BaseModel):
+    e_min: float
+    e_max: float
 
 
 def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None = None) -> FastAPI:
@@ -43,6 +50,14 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
     app.state.device = device
     gaze = GazeSession(device.eeg_between, lambda: device.backend.srate)
     app.state.gaze = gaze
+    engagement = LiveEngagement(device.eeg_between, device.window, lambda: device.backend.srate, time.monotonic)
+    app.state.engagement = engagement
+
+    def meaningful_eeg() -> bool:
+        """Real headset EEG, or synthetic EEG with a known engagement level. The plain simulated
+        headset's EEG is noise, so its engagement never reaches the model."""
+        b = device.backend
+        return device.state == "streaming" and (not getattr(b, "simulated", False) or getattr(b, "synthetic_eeg", False))
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1)(:\d+)?)$",
@@ -136,25 +151,70 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         """Straight to the chat: NeuroChat's own chat page. Open WebUI stays one click away from it."""
         return RedirectResponse("/chat.html")
 
-    def signals_for(msg: dict) -> str:
-        """The reading page's numbers for this paragraph plus the gaze log's visits and engagement.
-        Engagement is passed on only while a real headset streams: the fake one's EEG means nothing."""
+    @app.get("/api/engagement")
+    async def engagement_status():
+        """The NeuroChat engagement score right now (last 15 s), its bucket, and the calibration."""
+        st = engagement.status()
+        if not meaningful_eeg():
+            st["now"] = None
+        return st
+
+    @app.post("/api/engagement/calibration/{phase}/{step}")
+    async def calibrate(phase: str, step: str):
+        """Calibration as in the paper: start, about 2 minutes of relaxing (phase relax) or of the
+        word-chain task (phase task), finish. Both done → scores are normalized to them."""
+        if phase not in ("relax", "task") or step not in ("start", "finish"):
+            raise HTTPException(status_code=404, detail="Use /relax/start, /relax/finish, /task/start or /task/finish.")
+        if not meaningful_eeg():
+            raise HTTPException(status_code=409, detail="Connect the headset first.")
+        try:
+            if step == "start":
+                engagement.start(phase)
+            else:
+                engagement.finish(phase)
+        except CalibrationError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        return engagement.status()
+
+    @app.put("/api/engagement/calibration")
+    async def set_calibration(values: CalibrationValues):
+        """Use E_min and E_max from an earlier or offline calibration (python -m companion.engagement)."""
+        try:
+            engagement.set(values.e_min, values.e_max)
+        except CalibrationError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        return engagement.status()
+
+    @app.delete("/api/engagement/calibration")
+    async def clear_calibration():
+        engagement.clear()
+        return engagement.status()
+
+    def signals_for(msg: dict | None, follow_up: bool = False) -> str:
+        """What the system prompt is told about the reader for this turn: the reading page's numbers
+        for the paragraph (msg, the explain request), the gaze log's visits, and EEG engagement.
+        Engagement is the paragraph's own when gaze tracked it, else the paper's live score over the
+        last 15 s; follow-ups always get the live score, as the paper scores every message."""
+        msg = msg or {}
+
         def num(key):
             v = msg.get(key)
             return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
         index = msg.get("index")
-        row, median = None, None
+        row = None
         if isinstance(index, int):
-            summary = gaze.summary()
-            row = next((r for r in summary["paragraphs"] if r["paragraph"] == index), None)
-            median = summary["median_engagement"]
-        real_eeg = device.state == "streaming" and not getattr(device.backend, "simulated", False)
+            row = next((r for r in gaze.summary()["paragraphs"] if r["paragraph"] == index), None)
+        reading = None
+        if meaningful_eeg():
+            if row and row["engagement"] is not None and not follow_up:
+                reading = engagement.of(row["engagement"], "while they read this paragraph")
+            else:
+                reading = engagement.now()
         return reader_notes(
             num("dwellMsPer100Words"), num("medianMsPer100Words"),
             int(msg["rereads"]) if isinstance(msg.get("rereads"), int) else None,
             row["visits"] if row else None,
-            row["engagement"] if row and real_eeg else None,
-            median if real_eeg else None,
+            reading,
         )
 
     @app.websocket("/ws/chat")
@@ -175,7 +235,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         await ws.accept()
         history: list[dict] = []
         title = "Chat with the tutor"
-        system = SYSTEM_PROMPT
+        base = SYSTEM_PROMPT
+        passage: dict | None = None   # the explain request the conversation is on, for its reading numbers
         try:
             while True:
                 msg = await ws.receive_json()
@@ -194,21 +255,26 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                     history = [{"role": m["role"], "content": str(m["content"])[:12000]}
                                for m in msg.get("messages") or []
                                if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")][-40:]
-                    system = CHAT_PROMPT if msg.get("mode") == "chat" else SYSTEM_PROMPT
+                    base = CHAT_PROMPT if msg.get("mode") == "chat" else SYSTEM_PROMPT
+                    passage = None
                     title = (msg.get("title") or title)[:80]
                     await ws.send_json({"type": "loaded"})
                     continue
                 if msg.get("type") == "explain" and msg.get("paragraph"):
                     if not (msg.get("append") and history):
                         title = f"Explaining: {msg['paragraph'][:60].strip()}…"
-                        system = SYSTEM_PROMPT + signals_for(msg)
+                        base = SYSTEM_PROMPT
                         history = []
+                    passage = msg   # an appended passage brings its own numbers too
+                    system = base + signals_for(passage)
                     history.append({"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000],
                                                          msg.get("rereads") if isinstance(msg.get("rereads"), int) else None)})
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]
-                        system = CHAT_PROMPT
+                        base = CHAT_PROMPT
+                        passage = None
+                    system = base + signals_for(passage, follow_up=True)
                     history.append({"role": "user", "content": msg["text"].strip()})
                 else:
                     await ws.send_json({"type": "error", "message": "Unknown message."})

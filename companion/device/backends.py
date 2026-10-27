@@ -48,15 +48,20 @@ class Backend(Protocol):
 class SimulatedBackend:
     """Fake Athena: four channels of 1/f-ish noise with an alpha rhythm.
 
-    `bad_channel` makes one sensor flat, to exercise the signal check.
+    `bad_channel` makes one sensor flat, to exercise the signal check. `engagement` (a level from
+    0 to 1, or a function of seconds since connecting) streams synthetic EEG with that engagement
+    instead (see synthetic.py), which the tutor then treats as meaningful.
     """
 
     channels = EEG_CHANNELS
     srate = EEG_SRATE
     simulated = True
 
-    def __init__(self, bad_channel: str | None = None, seed: int = 7):
+    def __init__(self, bad_channel: str | None = None, seed: int = 7, engagement=None):
         self.bad_channel = bad_channel
+        self.engagement = engagement
+        self.synthetic_eeg = engagement is not None
+        self._stream = None
         self._rng = np.random.default_rng(seed)
         self._t0: float | None = None
         self._sent = 0
@@ -71,6 +76,9 @@ class SimulatedBackend:
         await asyncio.sleep(0.1)
         self._t0 = time.monotonic()
         self._sent = 0
+        if self.engagement is not None:
+            from ..synthetic import SyntheticStream
+            self._stream = SyntheticStream(self.engagement, srate=self.srate, seed=self._rng.integers(1 << 30))
 
     async def disconnect(self) -> None:
         self._t0 = None
@@ -84,6 +92,11 @@ class SimulatedBackend:
             return np.empty((len(self.channels), 0))
         t = (self._sent + np.arange(n)) / self.srate
         self._sent = due
+        if self._stream is not None:
+            data = self._stream.take(n)
+            if self.bad_channel in self.channels:
+                data[self.channels.index(self.bad_channel)] = 800.0
+            return data
         alpha = 8.0 * np.sin(2 * np.pi * 10.0 * t)
         noise = np.cumsum(self._rng.normal(0, 1.5, (len(self.channels), n)), axis=1) * 0.2
         data = 800.0 + alpha + noise + self._rng.normal(0, 4.0, (len(self.channels), n))

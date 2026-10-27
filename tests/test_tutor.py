@@ -87,14 +87,18 @@ def test_explain_a_selection_with_its_paragraph():
 
 
 def test_reader_notes_turn_signals_into_advice():
+    from companion.engagement import Calibration, reading
     from companion.tutor import reader_notes
+    cal = Calibration(0.3, 1.2)
     assert reader_notes() == ""
-    lost = reader_notes(46000, 23000, rereads=2, engagement=0.36, median_engagement=0.6)
+    lost = reader_notes(46000, 23000, rereads=2, engagement=reading(0.35, cal, "while they read this paragraph"))
     assert "46 s per 100 words, 2.0× their usual pace" in lost
     assert "went back to this paragraph 2 times" in lost and "rereading" in lost
-    assert "attention dropped" in lost and "60% of usual" in lost
-    focused = reader_notes(46000, 23000, engagement=0.62, median_engagement=0.6)
-    assert "content itself is hard" in focused and "went back" not in focused
+    assert "EEG engagement while they read this paragraph: 0.05" in lost and "LOW band" in lost
+    assert "lost them rather than challenged them" in lost and "under 80 words" in lost
+    focused = reader_notes(46000, 23000, engagement=reading(1.1, cal, "right now"))
+    assert "HIGH band" in focused and "content itself is hard" in focused and "went back" not in focused
+    assert "Never mention or hint at them" in focused
 
 
 def test_explain_puts_reading_signals_in_the_system_prompt():
@@ -111,18 +115,88 @@ def test_explain_puts_reading_signals_in_the_system_prompt():
             assert "measured" not in ollama.chats[-1]["messages"][0]["content"]
 
 
+def real_headset_app(ollama, eeg=None):
+    """An app whose simulated headset stands in for a real Athena, optionally with EEG already buffered."""
+    app = create_app(SimulatedBackend(), Tutor(transport=ollama))
+    app.state.device.state = "streaming"
+    app.state.device.backend.simulated = False
+    if eeg is not None:
+        app.state.device._append(eeg)
+    return app
+
+
 def test_real_headset_engagement_reaches_the_prompt():
     from companion.gaze import Visit
     ollama = fake_ollama()
-    app = create_app(SimulatedBackend(), Tutor(transport=ollama))
-    app.state.device.state = "streaming"
-    app.state.device.backend.simulated = False  # stand in for a real Athena
-    app.state.gaze.visits = [Visit(0, 0, 10, 0.6), Visit(1, 10, 20, 0.6), Visit(2, 20, 40, 0.3), Visit(2, 45, 50, 0.3)]
+    app = real_headset_app(ollama)
+    app.state.engagement.set(0.3, 1.2)
+    app.state.gaze.visits = [Visit(0, 0, 10, 0.75), Visit(1, 10, 20, 1.15), Visit(2, 20, 40, 0.35), Visit(2, 45, 50, 0.35)]
     with TestClient(app) as client, client.websocket_connect("/ws/chat") as ws:
         chat_turn(ws, {"type": "explain", "paragraph": "x", "index": 2})
         system = ollama.chats[-1]["messages"][0]["content"]
-        assert "EEG engagement here: 0.30, against 0.60" in system and "attention dropped" in system
+        assert "EEG engagement while they read this paragraph: 0.05" in system and "LOW band" in system
+        assert "against their own relaxed and focused calibration" in system
         assert "went back to this paragraph 1 time." in system
+        chat_turn(ws, {"type": "explain", "paragraph": "y", "index": 1, "append": True})
+        system = ollama.chats[-1]["messages"][0]["content"]  # an appended passage gets its own numbers
+        assert "HIGH band" in system and "LOW band" not in system and "went back" not in system
+        chat_turn(ws, {"type": "explain", "paragraph": "z", "index": 0})
+        assert "MODERATE band" in ollama.chats[-1]["messages"][0]["content"]
+
+
+def test_follow_ups_and_unindexed_passages_get_the_live_score():
+    from companion.synthetic import synthetic_eeg
+    ollama = fake_ollama()
+    app = real_headset_app(ollama, synthetic_eeg(0.05, 20, seed=4))
+    app.state.engagement.set(0.3, 1.2)
+    with TestClient(app) as client, client.websocket_connect("/ws/chat") as ws:
+        chat_turn(ws, {"type": "explain", "paragraph": "Selected on a web page", "rereads": 0})
+        system = ollama.chats[-1]["messages"][0]["content"]
+        assert "EEG engagement over the last 15 seconds" in system and "LOW band" in system
+        app.state.device._append(synthetic_eeg(1.0, 20, seed=5))
+        chat_turn(ws, {"type": "ask", "text": "Why?"})
+        system = ollama.chats[-1]["messages"][0]["content"]
+        assert "over the last 15 seconds" in system and "HIGH band" in system
+        assert client.get("/api/engagement").json()["now"]["bucket"] == "high"
+
+
+def test_engagement_without_calibration_is_relative_to_the_reading():
+    import numpy as np
+    from companion.synthetic import synthetic_eeg
+    ollama = fake_ollama()
+    levels = [0.9] * 60 + [0.1] * 20
+    app = real_headset_app(ollama, synthetic_eeg(levels, 80, seed=6))
+    with TestClient(app) as client, client.websocket_connect("/ws/chat") as ws:
+        chat_turn(ws, {"type": "ask", "text": "Explain entropy"})
+        system = ollama.chats[-1]["messages"][0]["content"]
+        assert system.startswith("You are a patient tutor. The person is reading")
+        assert "relative to the rest of this reading; no calibration was done" in system and "LOW band" in system
+    assert np.isfinite(app.state.engagement.now().raw)
+
+
+def test_calibration_api():
+    import time as _time
+    from companion.synthetic import synthetic_eeg
+    ollama = fake_ollama()
+    with TestClient(create_app(SimulatedBackend(), Tutor(transport=ollama))) as client:
+        assert client.post("/api/engagement/calibration/relax/start").status_code == 409  # no headset yet
+        app = client.app
+        app.state.device.state = "streaming"
+        app.state.device.backend.simulated = False
+        assert client.post("/api/engagement/calibration/sleep/start").status_code == 404
+        assert client.post("/api/engagement/calibration/task/finish").status_code == 409  # never started
+        for phase, level in (("relax", 0.05), ("task", 0.95)):
+            client.post(f"/api/engagement/calibration/{phase}/start")
+            app.state.engagement._recording[phase] = _time.monotonic() - 1   # as if it started 1 s ago...
+            app.state.device._filled = 0                                     # (only this phase's EEG in the buffer)
+            app.state.device._append(synthetic_eeg(level, 30, seed=8))       # ...and 30 s arrived since
+            app.state.engagement._recording[phase] -= 30
+            st = client.post(f"/api/engagement/calibration/{phase}/finish").json()
+        assert st["calibrated"] and st["bounds"]["relax"] < 0.4 < 0.8 < st["bounds"]["task"]
+        assert [b["name"] for b in st["buckets"]] == ["low", "moderate", "high"]
+        assert client.put("/api/engagement/calibration", json={"e_min": 1, "e_max": 0.5}).status_code == 422
+        assert client.put("/api/engagement/calibration", json={"e_min": 0.3, "e_max": 1.2}).json()["bounds"] == {"relax": 0.3, "task": 1.2}
+        assert client.delete("/api/engagement/calibration").json()["calibrated"] is False
 
 
 def test_explain_mentions_rereads():

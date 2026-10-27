@@ -17,7 +17,7 @@ import numpy as np
 from .backends import Backend, BackendError, DeviceInfo
 from .quality import channel_quality
 
-BUFFER_SECONDS = 60          # long enough to cover one paragraph visit
+BUFFER_SECONDS = 180         # covers a paragraph visit and a 2-minute engagement calibration
 QUALITY_SECONDS = 2
 WAVE_SECONDS = 2             # the live waveform on the connect screen
 WAVE_POINTS = 60
