@@ -33,3 +33,18 @@ Never `pkill -f` a pattern that appears in your own command.
 - Q1 (T5): are 5–10° saccades visible on AF7/AF8 at Muse S noise levels? Answered by Phase 1.
 - Q2 (T2): slow-paragraph threshold vs personal median (1.5×? MAD-based?). Decide in Builder with a
   DECISIONS entry.
+
+## T4/T5 eye movements (reading-signals, 2026-10-27)
+
+- Afonso & Heinrichs CSV (from their `xdf_to_csv.py`, github.com/FlorianHeinrichs/eeg_eye_tracking, MIT):
+  columns `Timestamp, EEG_TP9, EEG_AF7, EEG_AF8, EEG_TP10, Gaze_x, Gaze_y, Stimulus_x, Stimulus_y`;
+  gaze and stimulus are **mm from the screen centre**; 256 Hz; missing samples are `0`. File names
+  carry the task (`level-1-saccades`, `level-2-smooth`, ...), `train`/`test` and `PXXX_YY`. Their own
+  filter is 0.5–40 Hz Butterworth + 50/60 Hz notches. The reported viewing distance is about 60 cm, so
+  degrees = atan(mm / 600).
+- Approach (standard EOG on frontal sites, no new source needed): horizontal EOG ≈ AF8 − AF7, because the
+  cornea is positive, so looking right raises AF8 and lowers AF7. Blinks are a same-sign bump on AF7 and
+  AF8 that cancels in AF8 − AF7. Saccade = a step in HEOG found by a velocity threshold over a robust
+  noise floor; size = level after − level before, in µV, and degrees only after a per-person gain fit
+  (the dataset gives the true jump sizes). Jaw clench = a burst of 30–100 Hz EMG power on TP9/TP10.
+

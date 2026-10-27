@@ -20,6 +20,7 @@ Owner: Tester.
 | Engagement kernel, real data, e2e | tests/test_engagement.py, test_realdata.py, test_e2e.py |
 | Gaze visits | tests/test_gaze.py |
 | Tutor prompts, Open WebUI | tests/test_tutor.py, test_webui.py |
+| Eye movements: blinks, saccades + size, jaw clench, tracking-dataset loader, scoring (P1) | tests/test_eyemove.py (synthetic) |
 
 ## Not covered
 
