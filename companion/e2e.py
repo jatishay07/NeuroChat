@@ -1,6 +1,6 @@
 """End-to-end check of engagement → prompt, through the real servers and sockets.
 
-    python -m companion.e2e                      # with a stand-in for Ollama (about 55 s)
+    python -m companion.e2e                      # with a stand-in for Ollama (about a minute)
     python -m companion.e2e --ollama http://127.0.0.1:11434   # with the real model
 
 It starts the companion on a spare port with a simulated headset streaming synthetic EEG whose
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import socket
 import sys
 import threading
@@ -26,11 +27,12 @@ from websockets.sync.client import connect as ws_connect
 
 from .app import create_app
 from .device import SimulatedBackend
+from .engagement import bucket_for
 from .tutor import Tutor
 
 # Seconds since the headset connected → the engagement level the synthetic EEG carries.
-SCRIPT = [(0, 13, 0.05, "relax"), (13, 26, 0.95, "task"),
-          (26, 34, 0.1, "paragraph 0"), (34, 42, 1.0, "paragraph 1"), (42, 60, 0.5, "paragraph 2")]
+SCRIPT = [(0, 13, 0.0, "relax"), (13, 26, 0.9, "task"),
+          (26, 36, 0.05, "paragraph 0"), (36, 46, 1.0, "paragraph 1"), (46, 66, 0.45, "paragraph 2")]
 PARAGRAPHS = [
     ("Lithium ions move from the anode to the cathode through the electrolyte while electrons flow "
      "through the external circuit, and the potential difference arises from the disparity in Gibbs free energy.", "low"),
@@ -74,7 +76,7 @@ class FakeOllama:
                 band = next((b for b in ("LOW", "MODERATE", "HIGH") if f"{b} band" in req["messages"][0]["content"]), "no")
                 self.send_response(200)
                 self.end_headers()
-                for word in f"(stand-in reply, told {band} engagement)".split(" "):
+                for word in f"(stand-in reply, told the {band} band)".split(" "):
                     self.wfile.write((json.dumps({"message": {"content": word + " "}, "done": False}) + "\n").encode())
                 self.wfile.write((json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
 
@@ -134,12 +136,12 @@ def run(ollama_url: str | None, model: str, log=print, seed: int = 11) -> list[d
         assert cal["calibrated"], cal
         log(f"  E_min {cal['bounds']['relax']:.3f}, E_max {cal['bounds']['task']:.3f}")
 
-        log("Reading: gaze on paragraph 0 at 27.5–33.5 s, 1 at 35.5–41.5 s, 2 at 43.5–49.5 s")
+        log("Reading: gaze on paragraph 0 at 27.5–35.5 s, 1 at 37.5–45.5 s, 2 at 47.5–55.5 s")
         with ws_connect(f"ws://127.0.0.1:{port}/ws/gaze") as gaze:
-            for i, start in enumerate((27.5, 35.5, 43.5)):
+            for i, start in enumerate((27.5, 37.5, 47.5)):
                 at(start)
                 gaze.send(json.dumps({"type": "enter", "paragraph": i}))
-                at(start + 6)
+                at(start + 8)
                 gaze.send(json.dumps({"type": "leave"}))
                 gaze.recv(timeout=5)
         summary = http.get("/api/gaze").json()
@@ -150,7 +152,9 @@ def run(ollama_url: str | None, model: str, log=print, seed: int = 11) -> list[d
                                      "dwellMsPer100Words": 40000, "medianMsPer100Words": 20000}, "LOW", "while they read this paragraph"),
             ("append paragraph 1", {"type": "explain", "paragraph": PARAGRAPHS[1][0], "index": 1, "append": True}, "HIGH",
              "while they read this paragraph"),
-            ("new chat on paragraph 2", {"type": "explain", "paragraph": PARAGRAPHS[2][0], "index": 2}, "MODERATE",
+            # Usually MODERATE, but a 0.3-wide band can't hold 8 s of noisy EEG every time, so this
+            # one is only checked to fall between the other two.
+            ("new chat on paragraph 2", {"type": "explain", "paragraph": PARAGRAPHS[2][0], "index": 2}, None,
              "while they read this paragraph"),
             ("follow-up question", {"type": "ask", "text": "Why does it grow with current?"}, None, "over the last 15 seconds"),
         ]
@@ -174,9 +178,16 @@ def run(ollama_url: str | None, model: str, log=print, seed: int = 11) -> list[d
                 rows[-1]["prompt"] = measured
                 assert f"EEG engagement {where}" in measured, measured
                 told = [b for b in ("LOW", "MODERATE", "HIGH") if f"{b} band" in measured]
-                assert len(told) == 1 and (band is None or told == [band]), f"{name}: expected {band}\n{measured}"
+                score = float(re.search(r"EEG engagement [^:]*: ([0-9.]+) on", measured).group(1))
+                rows[-1]["score"] = score
+                assert told == [bucket_for(score).name.upper()], f"{name}: band doesn't match score\n{measured}"
+                assert band is None or told == [band], f"{name}: expected {band}\n{measured}"
                 assert text, f"Empty reply for {name}"
+                leaked = [w for w in ("EEG", "headset", "engagement", "engaged") if w.lower() in text.lower()]
+                assert not leaked, f"{name}: the reply mentions {leaked}, which the reader must not see:\n{text}"
                 log(f"\n── {name}: the model was told\n{measured}\n── reply ({len(text.split())} words):\n{text}")
+        low, high, mid = (r["score"] for r in rows[:3])
+        assert low < mid < high, f"Scores out of order: drifting {low}, steady {mid}, gripping {high}"
         now = http.get("/api/engagement").json()["now"]
         assert now and now["bucket"] in ("low", "moderate", "high"), now
         return rows

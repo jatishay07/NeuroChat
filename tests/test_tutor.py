@@ -94,11 +94,11 @@ def test_reader_notes_turn_signals_into_advice():
     lost = reader_notes(46000, 23000, rereads=2, engagement=reading(0.35, cal, "while they read this paragraph"))
     assert "46 s per 100 words, 2.0× their usual pace" in lost
     assert "went back to this paragraph 2 times" in lost and "rereading" in lost
-    assert "EEG engagement while they read this paragraph: 0.06" in lost and "LOW band" in lost
+    assert "EEG engagement while they read this paragraph: 0.05" in lost and "LOW band" in lost
     assert "lost them rather than challenged them" in lost and "under 80 words" in lost
     focused = reader_notes(46000, 23000, engagement=reading(1.1, cal, "right now"))
     assert "HIGH band" in focused and "content itself is hard" in focused and "went back" not in focused
-    assert "Never mention the EEG" in focused
+    assert "Never mention or hint at them" in focused
 
 
 def test_explain_puts_reading_signals_in_the_system_prompt():
@@ -134,7 +134,7 @@ def test_real_headset_engagement_reaches_the_prompt():
     with TestClient(app) as client, client.websocket_connect("/ws/chat") as ws:
         chat_turn(ws, {"type": "explain", "paragraph": "x", "index": 2})
         system = ollama.chats[-1]["messages"][0]["content"]
-        assert "EEG engagement while they read this paragraph: 0.06" in system and "LOW band" in system
+        assert "EEG engagement while they read this paragraph: 0.05" in system and "LOW band" in system
         assert "against their own relaxed and focused calibration" in system
         assert "went back to this paragraph 1 time." in system
         chat_turn(ws, {"type": "explain", "paragraph": "y", "index": 1, "append": True})

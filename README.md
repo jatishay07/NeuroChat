@@ -149,7 +149,7 @@ The score falls in one of three bands, and each band adds its own instructions t
 
 When you ask about a paragraph, the score is the one from while your eyes were on it; for an added
 passage it's that passage's own; for a follow-up question it's the last 15 seconds, as in the paper.
-The model is told never to mention the EEG. The plain simulated headset's EEG is noise and never
+The model is told never to mention or hint at the EEG, and the end-to-end check fails if a reply does. The plain simulated headset's EEG is noise and never
 reaches the prompt.
 
 ```bash

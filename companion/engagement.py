@@ -220,7 +220,8 @@ def engagement_notes(r: Reading) -> tuple[str, list[str]]:
     """For the tutor's system prompt: what was measured (one line) and the bucket's instructions."""
     against = ("normalized 0–1 against their own relaxed and focused calibration" if r.source == "calibration"
                else "0–1 relative to the rest of this reading; no calibration was done")
-    seen = (f"- EEG engagement {r.where}: {r.score:.2f} on a 0–1 scale ({against}), "
+    shown = np.floor(r.score * 100) / 100   # rounded down, so 0.598 never reads 0.60 yet sits below the 0.6 edge
+    seen = (f"- EEG engagement {r.where}: {shown:.2f} on a 0–1 scale ({against}), "
             f"which puts them in the {r.bucket.name.upper()} band. {r.bucket.summary}")
     return seen, [*r.bucket.guidance, "These instructions override the length and depth given above."]
 

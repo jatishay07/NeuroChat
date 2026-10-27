@@ -129,7 +129,8 @@ def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_
     notes = "\n\nWhat the eye tracker and headset measured:\n" + "\n".join(seen)
     if advice:
         notes += "\nAdapt your explanation to this:\n" + "\n".join(f"- {a}" for a in advice)
-    return notes + "\nNever mention the EEG, the headset or these measurements unless they ask."
+    return notes + ("\nThese measurements are hidden from them. Never mention or hint at them: no EEG, headset, "
+                     "engagement, attention, focus or scores, not even as \"given your engagement\", unless they ask.")
 
 
 def explain_request(paragraph: str, title: str | None = None, context: str | None = None,
