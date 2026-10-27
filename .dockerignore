@@ -13,3 +13,5 @@ data/
 node_modules/
 extension/
 tests/
+.graph
+CLAUDE.md
