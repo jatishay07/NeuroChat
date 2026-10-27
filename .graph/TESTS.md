@@ -21,6 +21,7 @@ Owner: Tester.
 | Gaze visits | tests/test_gaze.py |
 | Tutor prompts, Open WebUI | tests/test_tutor.py, test_webui.py |
 | Eye movements: blinks, saccades + size, jaw clench, tracking-dataset loader, scoring (P1) | tests/test_eyemove.py (synthetic) |
+| Recording mode: samples_between across the buffer wrap, recorder + summary, /api/record + /ws/record, page served (T7) | tests/test_session_record.py; record page also driven end to end in Playwright with `?quick` (manual, not in CI) |
 
 ## Not covered
 

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from .device import Backend, BackendError, BrowserHeadset, DeviceManager
 from .engagement import CalibrationError, LiveEngagement
 from .gaze import GazeSession, visit_json
+from .session_record import record_router
 from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request, reader_notes
 from .webui import WebUI, WebUIError
 
@@ -325,6 +326,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
     @app.get("/api/gaze")
     async def gaze_summary():
         return gaze.summary()
+
+    app.include_router(record_router(device))   # Phase 2 recording page (reading-signals)
 
     if PORTAL_DIR.is_dir():
         app.mount("/", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
