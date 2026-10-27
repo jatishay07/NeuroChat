@@ -22,6 +22,7 @@ Owner: Tester.
 | Tutor prompts, Open WebUI | tests/test_tutor.py, test_webui.py |
 | Eye movements: blinks, saccades + size, jaw clench, tracking-dataset loader, scoring (P1) | tests/test_eyemove.py (synthetic) |
 | Study mode (S1–S6): pace unit tests under Node, page in Chromium with a stand-in tutor | tests/test_study.py, tests/study/ (browser part skips without Node Playwright) |
+| Recording mode: samples_between across the buffer wrap, recorder + summary, /api/record + /ws/record, page served (T7) | tests/test_session_record.py; record page also driven end to end in Playwright with `?quick` (manual, not in CI) |
 
 ## Not covered
 
