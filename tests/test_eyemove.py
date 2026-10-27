@@ -152,3 +152,19 @@ def test_command_line_summary(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["blinks"] == 1 and out["saccades"] > 5
     assert len(out["events"]["saccades"]) == out["saccades"]
+
+
+def test_phase1_report_over_a_folder(tmp_path, capsys):
+    from companion import eyedata
+    for i in range(2):
+        _write_tracking_csv(tmp_path / f"P00{i}_01_level-1-saccades_train.csv", seconds=25.0)
+    (tmp_path / "P009_01_level-1-smooth_train.csv").write_text("Timestamp\n")   # filtered out by task
+    (tmp_path / "P008_01_level-1-saccades_test.csv").write_text("Timestamp,EEG_TP9\n1,2\n")  # unreadable
+    eyedata.main([str(tmp_path), "--out", str(tmp_path / "report.json")])
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report == json.loads(capsys.readouterr().out)
+    assert report["recordings"] == 2 and len(report["skipped"]) == 1
+    assert [r["k"] for r in report["thresholds"]] == list(eyedata.THRESHOLDS)
+    assert report["p3"]["k"] is not None
+    with pytest.raises(SystemExit):
+        eyedata.main([str(tmp_path / "nothing-here")])

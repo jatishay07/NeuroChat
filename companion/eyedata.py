@@ -199,3 +199,81 @@ def score_saccades(saccades: list[Saccade], jumps: list[tuple[float, float]], se
                if any(tj + window[0] <= s.onset <= tj + window[1] for tj, _ in jumps)}
     false_alarms = sum(1 for i in range(len(saccades)) if i not in used and i not in excused)
     return Score(matches=matches, false_alarms=false_alarms, minutes=seconds / 60)
+
+
+# ---- Phase 1 report (T5) -------------------------------------------------------------------------
+
+THRESHOLDS = (3.0, 4.0, 5.0, 6.0, 8.0)   # saccade k values to sweep
+FALSE_ALARM_BUDGET = 1.0                 # per minute: the go/stop rules' ceiling
+
+
+def evaluate(files: list[Path], thresholds: tuple[float, ...] = THRESHOLDS) -> dict:
+    """Pooled hit rates by jump size and false alarms per minute at each threshold, plus each
+    recording's µV-per-degree gain, over the saccade recordings of the tracking dataset."""
+    from .eyemove import detect_blinks, detect_saccades, fit_gain
+
+    pooled = {k: {"matches": [], "false_alarms": 0, "minutes": 0.0} for k in thresholds}
+    gains, used, skipped = [], 0, []
+    for path in files:
+        try:
+            rec = load_tracking_csv(path)
+        except (ValueError, OSError) as e:
+            skipped.append(f"{path.name}: {e}")
+            continue
+        if np.isnan(rec.eeg).mean() > 0.2 or rec.eeg.shape[1] < rec.srate * 20:
+            skipped.append(f"{path.name}: too short or too many missing samples")
+            continue
+        jumps = [(t, dx) for t, dx, _ in stimulus_jumps(rec)]
+        seconds = rec.eeg.shape[1] / rec.srate
+        blinks = detect_blinks(rec.eeg, rec.srate)
+        for k in thresholds:
+            score = score_saccades(detect_saccades(rec.eeg, rec.srate, blinks, k=k), jumps, seconds)
+            pooled[k]["matches"] += score.matches
+            pooled[k]["false_alarms"] += score.false_alarms
+            pooled[k]["minutes"] += score.minutes
+            if k == 5.0:
+                hits = [m for m in score.matches if m.saccade is not None]
+                try:
+                    gains.append(fit_gain([m.saccade.step_uv for m in hits], [m.jump_deg for m in hits]))
+                except ValueError:
+                    pass
+        used += 1
+    rows = []
+    for k, p in pooled.items():
+        s = Score(matches=p["matches"], false_alarms=p["false_alarms"], minutes=p["minutes"])
+        rows.append({"k": k, "false_alarms_per_minute": round(s.false_alarms_per_minute, 2), "by_size": s.by_size()})
+    ok = [r for r in rows if r["false_alarms_per_minute"] <= FALSE_ALARM_BUDGET]
+    best = min(ok, key=lambda r: r["k"]) if ok else None
+    mid = next((b for b in best["by_size"] if b["size_deg"] == "5-10"), None) if best else None
+    return {"recordings": used, "skipped": skipped, "thresholds": rows,
+            "gain_uv_per_degree": {"median": round(float(np.median(gains)), 2) if gains else None,
+                                   "iqr": [round(float(q), 2) for q in np.percentile(gains, [25, 75])] if gains else None,
+                                   "n": len(gains)},
+            "p3": {"k": best["k"] if best else None,
+                   "hit_rate_5_10_deg": mid["hit_rate"] if mid else None,
+                   "false_alarms_per_minute": best["false_alarms_per_minute"] if best else None}}
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    import json
+
+    p = argparse.ArgumentParser(prog="python -m companion.eyedata",
+                                description="Score the eye-movement detectors on the Afonso & Heinrichs Muse S dataset.")
+    p.add_argument("folder", help="unzipped csv_raw.zip")
+    p.add_argument("--task", default="saccades", help="file-name filter (default: saccades)")
+    p.add_argument("--limit", type=int, help="score only the first N recordings")
+    p.add_argument("--out", help="write the JSON report here too")
+    args = p.parse_args(argv)
+    files = find_tracking_files(args.folder, args.task)[: args.limit]
+    if not files:
+        raise SystemExit(f"No {args.task} CSVs under {args.folder}")
+    report = evaluate(files)
+    text = json.dumps(report, indent=2)
+    if args.out:
+        Path(args.out).write_text(text)
+    print(text)
+
+
+if __name__ == "__main__":
+    main()
