@@ -148,7 +148,8 @@
         for (const l of lines) {
           const last = blocks.at(-1)?.split("\n") ?? [], prev = last.at(-1);
           const inList = last.some((x) => ITEM.test(x));
-          if (prev !== undefined && (ITEM.test(l) ? inList || /:$/.test(prev) : inList && !ends(prev))) blocks[blocks.length - 1] += `\n${l}`;
+          // A wrapped item carries on in lower case; "Mix the flour…" after "- 3 eggs" is the next paragraph.
+          if (prev !== undefined && (ITEM.test(l) ? inList || /:$/.test(prev) : inList && !ends(prev) && /^\p{Ll}/u.test(l))) blocks[blocks.length - 1] += `\n${l}`;
           else blocks.push(l);
         }
       }
@@ -161,7 +162,7 @@
       // A label: a Markdown heading, a short line on its own, or a short line sitting right above a
       // much longer one ("History" over its paragraph; a hard-wrapped line is as long as the next).
       if (HEADING.test(lines[0]) || (isHeading(lines[0], !items.length) && (lines.length === 1 || words(lines[0]) * 2 <= words(lines[1])))) {
-        items.push({ heading: lines[0].replace(HEADING, "").trim() });
+        items.push({ heading: lines[0].replace(HEADING, "").trim(), marked: HEADING.test(lines[0]) });
         lines.shift();
         if (!lines.length) continue;
       }
@@ -182,17 +183,18 @@
     let title = null;
     if (items.length > 1 && items[0].heading !== undefined) title = items.shift().heading;
     const paragraphs = [], headings = [];
-    let pending = null;
+    let pending = null, marked = false;
     for (const it of items) {
       if (it.heading !== undefined) {
         // Two labels in a row: the first had nothing under it, so it was text after all.
         if (pending !== null) { paragraphs.push(pending); headings.push(null); }
         pending = it.heading;
+        marked = it.marked;
         continue;
       }
       // A label mid-text needs a paragraph clearly longer than itself; otherwise (a line of a poem)
       // it's text.
-      if (pending !== null && paragraphs.length && words(it.text) < 2 * words(pending)) { paragraphs.push(pending); headings.push(null); pending = null; }
+      if (pending !== null && !marked && paragraphs.length && words(it.text) < 2 * words(pending)) { paragraphs.push(pending); headings.push(null); pending = null; }
       paragraphs.push(it.text);
       headings.push(pending);
       pending = null;

@@ -141,3 +141,10 @@ test("S1 (round 4): wrapped numbered items, labels above their text, poems", () 
   assert.ok(poem.headings.every((h) => h === null), JSON.stringify(poem));
   assert.equal(poem.paragraphs.map(P.words).reduce((a, b) => a + b), 25, "no words lost");
 });
+
+test("S1 (round 5): an unpunctuated list ends where a capitalised paragraph starts; # headings always label", () => {
+  const recipe = P.parseText("Pancakes\nIngredients\n- 2 cups flour\n- 1 tsp salt\n- 3 eggs\nMix the flour and salt in a large bowl, then whisk in the eggs one at a time.");
+  assert.deepEqual(recipe.paragraphs.slice(-2), ["• 2 cups flour\n• 1 tsp salt\n• 3 eggs", "Mix the flour and salt in a large bowl, then whisk in the eggs one at a time."]);
+  const md = P.parseText("# Notes\n\nIntro text that is long enough here.\n\n## Short bit\n\nTiny.");
+  assert.deepEqual(md.headings, [null, "Short bit"]);
+});
