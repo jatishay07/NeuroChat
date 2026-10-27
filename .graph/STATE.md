@@ -39,3 +39,12 @@ Each thread adds a `### <thread-id>` section here: current node, last handoff li
 
 ### graph
 - Node: Integrator. Last: `[Builder] seed CLAUDE.md + .graph → PR opened → Integrator`.
+
+### engagement
+- Node: idle (T9 waits on Athena data). Last: `[Integrator] PR #25 kernel + bands + real-data check → merged → idle`.
+- Retries: none open.
+- Done: kernel per paper §3.2, 3 bands (0.3 / 0.6) in the Qwen prompt, synthetic + real-file loaders, e2e
+  in Docker CI with real Qwen. Real Muse data (Bird et al. 2018): direction right (concentrating > neutral, 3/4),
+  bands read too low because the max-based E_max is an outlier; notes in /mnt/project-files/neurochat/real-eeg-test.md.
+- Next: T9 when Atishay sends ~10 min labelled Athena data (calm + focused stretches). T8 is free for any thread;
+  the API it needs is in CONTRACTS (engagement section of my THREADS row).
