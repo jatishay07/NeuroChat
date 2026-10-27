@@ -130,7 +130,8 @@ When more than one thread is active (the normal case here):
   across threads) live in `CONTRACTS.md`. Changing one requires a `DECISIONS.md` entry and a message to
   every thread listed as depending on it.
 - **Integrator is the only node that merges** to `main`. It reads all inboxes, resolves conflicts,
-  runs the full suite.
+  runs the full suite. It merges a PR only after its thread sends `READY <PR> <head sha>` and CI is green
+  on that head; any later push or a `HOLD` message from the thread cancels the READY.
 
 ## 7. Build → test → iterate, always
 
