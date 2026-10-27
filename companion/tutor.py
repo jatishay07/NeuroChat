@@ -1,5 +1,9 @@
 """The tutor: re-explains a paragraph the reader struggled with, using a local model in Ollama.
 
+Any model works. NEUROCHAT_MODEL picks the model (default qwen3.5:4b). By default it runs in Ollama;
+set NEUROCHAT_LLM_URL to any OpenAI-compatible endpoint (LM Studio, llama.cpp's server, vLLM, OpenAI,
+OpenRouter...) to use that instead, with NEUROCHAT_LLM_API_KEY if it needs a key.
+
 Each chat (one WebSocket) keeps its own message history so follow-up questions have context.
 Replies stream token by token.
 """
@@ -16,7 +20,10 @@ from .engagement import Reading, engagement_notes
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not OLLAMA_URL.startswith("http"):
     OLLAMA_URL = f"http://{OLLAMA_URL}"
-DEFAULT_MODEL = os.environ.get("NEUROCHAT_MODEL", "qwen3.5:4b")
+DEFAULT_MODEL = os.environ.get("NEUROCHAT_MODEL") or "qwen3.5:4b"
+# An OpenAI-compatible endpoint, e.g. http://127.0.0.1:1234/v1. Empty means Ollama.
+LLM_URL = os.environ.get("NEUROCHAT_LLM_URL", "").rstrip("/")
+LLM_API_KEY = os.environ.get("NEUROCHAT_LLM_API_KEY", "")
 
 SYSTEM_PROMPT = """You are a patient tutor helping someone who is reading a text.
 They just spent much longer than usual on one paragraph, which suggests it confused them.
@@ -39,16 +46,24 @@ class TutorError(Exception):
 
 
 class Tutor:
+    """Talks to Ollama, or to an OpenAI-compatible server when openai_url is given."""
+
     def __init__(self, model: str = DEFAULT_MODEL, base_url: str = OLLAMA_URL,
-                 transport: httpx.AsyncBaseTransport | None = None):
+                 transport: httpx.AsyncBaseTransport | None = None,
+                 openai_url: str | None = LLM_URL or None, api_key: str = LLM_API_KEY):
         self.model = model
-        self.base_url = base_url
+        self.openai = bool(openai_url)
+        self.base_url = openai_url if self.openai else base_url
+        self._headers = {"Authorization": f"Bearer {api_key}"} if self.openai and api_key else {}
         self._transport = transport  # tests pass a mock transport
 
     def _client(self, timeout: float | None) -> httpx.AsyncClient:
-        return httpx.AsyncClient(base_url=self.base_url, timeout=timeout, transport=self._transport)
+        return httpx.AsyncClient(base_url=self.base_url, timeout=timeout, transport=self._transport,
+                                 headers=self._headers)
 
     async def status(self) -> dict:
+        if self.openai:
+            return await self._openai_status()
         try:
             async with self._client(3.0) as c:
                 r = await c.get("/api/tags")
@@ -64,6 +79,10 @@ class Tutor:
 
     async def stream(self, messages: list[dict], system: str = SYSTEM_PROMPT) -> AsyncIterator[str]:
         """Send the conversation and yield the reply as it arrives."""
+        if self.openai:
+            async for text in self._openai_stream(messages, system):
+                yield text
+            return
         body = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *messages],
@@ -91,6 +110,52 @@ class Tutor:
                         break
         except httpx.ConnectError as e:
             raise TutorError("Ollama isn't running. Start NeuroChat with the neurochat command to start it.") from e
+
+    async def _openai_status(self) -> dict:
+        unreachable = f"Can't reach the model server at {self.base_url} (NEUROCHAT_LLM_URL)."
+        try:
+            async with self._client(5.0) as c:
+                r = await c.get("/models")
+        except httpx.HTTPError:
+            return {"model": self.model, "ready": False, "error": unreachable}
+        if r.status_code in (401, 403):
+            return {"model": self.model, "ready": False,
+                    "error": f"The model server at {self.base_url} refused the API key (NEUROCHAT_LLM_API_KEY)."}
+        if r.status_code >= 400:
+            return {"model": self.model, "ready": False, "error": unreachable}
+        ids = {m.get("id") for m in (r.json().get("data") or [])}
+        if ids and self.model not in ids:
+            return {"model": self.model, "ready": False,
+                    "error": f"The model server at {self.base_url} has no model called {self.model} (NEUROCHAT_MODEL)."}
+        return {"model": self.model, "ready": True, "error": None}
+
+    async def _openai_stream(self, messages: list[dict], system: str) -> AsyncIterator[str]:
+        body = {
+            "model": self.model,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "stream": True,
+            "temperature": 0.4,
+        }
+        try:
+            async with self._client(None) as c, c.stream("POST", "/chat/completions", json=body) as r:
+                if r.status_code >= 400:
+                    detail = (await r.aread()).decode(errors="replace")[:200]
+                    raise TutorError(f"The model server returned an error: {detail}")
+                async for line in r.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    chunk = json.loads(data)
+                    if chunk.get("error"):
+                        raise TutorError(f"The model server returned an error: {chunk['error']}")
+                    for choice in chunk.get("choices") or []:
+                        text = (choice.get("delta") or {}).get("content")
+                        if text:
+                            yield text
+        except httpx.ConnectError as e:
+            raise TutorError(f"Can't reach the model server at {self.base_url} (NEUROCHAT_LLM_URL).") from e
 
 
 def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_words: float | None = None,

@@ -6,15 +6,18 @@ extension use the same endpoints.
 from __future__ import annotations
 
 import asyncio
+import os
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.websockets import WebSocketClose
 
 from .device import Backend, BackendError, BrowserHeadset, DeviceManager
 from .engagement import CalibrationError, LiveEngagement
@@ -23,6 +26,36 @@ from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_reques
 from .webui import WebUI, WebUIError
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
+
+# Who may talk to the companion. CORS alone isn't enough: browsers don't apply it to WebSockets or
+# to simple POSTs, so any website you visit could otherwise drive the tutor or read the headset
+# through ws://127.0.0.1:8765. Allowed: the portal itself, Open WebUI and the browser extension.
+ALLOWED_ORIGINS = re.compile(r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?)$")
+# Host names the companion answers to, against DNS rebinding. NEUROCHAT_ALLOWED_HOSTS adds more
+# (comma-separated), e.g. to reach it from another device on purpose.
+ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]", "host.docker.internal",
+                 *filter(None, os.environ.get("NEUROCHAT_ALLOWED_HOSTS", "").split(","))}
+
+
+class LocalOnly:
+    """Refuses requests from other websites (by Origin) and to other host names (by Host)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope["headers"]}
+            host = re.sub(r":\d+$", "", headers.get("host", ""))
+            origin = headers.get("origin")
+            if host not in ALLOWED_HOSTS or (origin is not None and not ALLOWED_ORIGINS.match(origin)):
+                if scope["type"] == "websocket":
+                    await WebSocketClose(code=1008)(scope, receive, send)
+                else:
+                    await PlainTextResponse("NeuroChat only answers its own pages on this computer.",
+                                            status_code=403)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 class ConnectRequest(BaseModel):
@@ -60,10 +93,11 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         return device.state == "streaming" and (not getattr(b, "simulated", False) or getattr(b, "synthetic_eeg", False))
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1)(:\d+)?)$",
+        allow_origin_regex=ALLOWED_ORIGINS.pattern,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(LocalOnly)
 
     @app.get("/api/device")
     async def device_status():

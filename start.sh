@@ -6,7 +6,9 @@
 #   --no-update     don't pull the latest version first
 #   --no-webui      don't start Open WebUI (the full chat portal on http://127.0.0.1:3000)
 # It also installs a `neurochat` command that runs this script from anywhere.
-# NEUROCHAT_MODEL picks another Ollama model (default qwen3.5:4b, a 3.3 GB download).
+# NEUROCHAT_MODEL picks another model (default qwen3.5:4b in Ollama, a 3.3 GB download).
+# NEUROCHAT_LLM_URL uses an OpenAI-compatible server instead of Ollama (e.g. http://127.0.0.1:1234/v1
+# for LM Studio), with NEUROCHAT_LLM_API_KEY if it needs one; Ollama isn't installed then.
 # NEUROCHAT_WEBUI=docker|local|off picks how Open WebUI runs (default: Docker when it's running).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -153,7 +155,9 @@ setup_model() {
     echo "Couldn't download $MODEL. If it says Ollama is too old, update it from https://ollama.com/download and run neurochat again." >&2; return 1
   fi
 }
-if [ "$skip_model" = 0 ]; then
+if [ -n "${NEUROCHAT_LLM_URL:-}" ]; then
+  echo "Using $MODEL from $NEUROCHAT_LLM_URL (NEUROCHAT_LLM_URL), so not setting up Ollama."
+elif [ "$skip_model" = 0 ]; then
   setup_model || echo "Carrying on without the local model; the headset screens still work." >&2
 fi
 export NEUROCHAT_MODEL="$MODEL"
@@ -203,8 +207,15 @@ WEBUI_PORT=3000
 WEBUI_PID=""
 WEBUI_CONTAINER=""
 # Fewer background requests (follow-up suggestions, tags, autocomplete) keep a small model responsive.
-webui_vars=(WEBUI_AUTH=False ENABLE_OPENAI_API=False DEFAULT_MODELS=neurochat-tutor ENABLE_FOLLOW_UP_GENERATION=False
+webui_vars=(WEBUI_AUTH=False DEFAULT_MODELS=neurochat-tutor ENABLE_FOLLOW_UP_GENERATION=False
   ENABLE_TAGS_GENERATION=False ENABLE_AUTOCOMPLETE_GENERATION=False)
+# Your own OpenAI-compatible server shows up in Open WebUI too. Open WebUI keeps the connection it
+# was first set up with; change it later in its Admin Settings > Connections.
+if [ -n "${NEUROCHAT_LLM_URL:-}" ]; then
+  webui_vars+=(ENABLE_OPENAI_API=True "OPENAI_API_BASE_URL=$NEUROCHAT_LLM_URL" "OPENAI_API_KEY=${NEUROCHAT_LLM_API_KEY:-none}")
+else
+  webui_vars+=(ENABLE_OPENAI_API=False)
+fi
 start_webui_docker() {
   command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo "Docker isn't running." >&2; return 1; }
   if docker container inspect neurochat-webui >/dev/null 2>&1; then
@@ -218,6 +229,12 @@ start_webui_docker() {
       net=(--network host -e "PORT=$WEBUI_PORT" -e HOST=127.0.0.1 -e OLLAMA_BASE_URL=http://127.0.0.1:11434)
     else
       net=(-p "127.0.0.1:$WEBUI_PORT:8080" -e OLLAMA_BASE_URL=http://host.docker.internal:11434)
+      # Inside the container, this computer is host.docker.internal.
+      for v in "${!env[@]}"; do
+        case "${env[$v]}" in OPENAI_API_BASE_URL=*)
+          env[$v]="$(printf '%s' "${env[$v]}" | sed -E 's#//(127\.0\.0\.1|localhost)([:/]|$)#//host.docker.internal\2#')" ;;
+        esac
+      done
     fi
     docker run -d --name neurochat-webui -v neurochat-webui:/app/backend/data "${net[@]}" "${env[@]}" \
       ghcr.io/open-webui/open-webui:main >/dev/null || return 1

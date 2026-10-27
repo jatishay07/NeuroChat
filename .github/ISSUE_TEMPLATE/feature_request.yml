@@ -1,0 +1,20 @@
+name: Idea or feature request
+description: Suggest something NeuroChat should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The reading or studying situation, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: textarea
+    id: research
+    attributes:
+      label: Papers or prior work
+      description: Links welcome, especially for anything that reads EEG or eye movements.

@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work as the README says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **don't attach EEG or eye-tracking recordings**, screenshots of your
+        webcam, or anything with personal information: issues are public. For security problems, see
+        SECURITY.md instead of opening an issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Ran `neurochat --simulate`\n2. Clicked ...\n3. ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How do you run it?
+      options: [neurochat / start.sh, start.cmd (Windows), Docker image, docker compose, manual (python -m companion), Chrome extension]
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: OS, browser and model
+      placeholder: "macOS 15 on Apple Silicon, Chrome 141, qwen3.5:4b in Ollama"
+  - type: dropdown
+    id: headset
+    attributes:
+      label: Headset
+      options: [None / simulated, Muse S Athena, Other Muse]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal output or `docker logs neurochat`
+      description: Check it for your username, file paths or anything private before pasting.
+      render: text
