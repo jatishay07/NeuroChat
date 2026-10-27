@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 
 from companion.app import create_app
 from companion.device import SimulatedBackend
-from companion.gaze import GazeSession, engagement_index
+from companion.engagement import engagement_index
+from companion.gaze import GazeSession
 
 SRATE = 256.0
 
@@ -16,9 +17,9 @@ def sine(freq, seconds=4.0, amp=10.0):
 
 
 def test_engagement_index_is_high_for_beta_and_low_for_alpha():
-    beta, alpha = engagement_index(sine(20), SRATE), engagement_index(sine(10), SRATE)
+    beta, alpha = engagement_index(sine(15), SRATE), engagement_index(sine(9), SRATE)
     assert beta > 10 and alpha < 0.1
-    assert engagement_index(sine(20, seconds=0.5), SRATE) is None  # too short
+    assert engagement_index(sine(15, seconds=0.5), SRATE) is None  # too short
 
 
 class FakeClock:
@@ -34,7 +35,7 @@ def test_visits_line_up_with_eeg_between_their_times():
 
     def eeg_between(t0, t1):
         asked.append((t0, t1))
-        return sine(20, seconds=t1 - t0)
+        return sine(15, seconds=t1 - t0)
 
     s = GazeSession(eeg_between, lambda: SRATE, clock)
     assert s.enter(0) is None

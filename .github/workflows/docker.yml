@@ -58,6 +58,9 @@ jobs:
           curl -fsS -o /dev/null localhost:8765/eyes.html
           docker exec nc curl -fsS localhost:11434/api/chat -d \
             '{"model":"qwen3.5:4b","stream":false,"think":false,"messages":[{"role":"user","content":"Say hello in five words."}]}'
+      - name: Engagement score reaches the real model, end to end
+        if: matrix.arch == 'amd64'
+        run: docker exec -w /opt/neurochat nc .venv/bin/python -m companion.e2e --ollama http://127.0.0.1:11434
       - name: Logs
         if: failure()
         run: docker logs nc 2>&1 | tail -100 || true

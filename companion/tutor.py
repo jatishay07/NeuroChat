@@ -11,6 +11,8 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from .engagement import Reading, engagement_notes
+
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not OLLAMA_URL.startswith("http"):
     OLLAMA_URL = f"http://{OLLAMA_URL}"
@@ -93,11 +95,13 @@ class Tutor:
 
 def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_words: float | None = None,
                  rereads: int | None = None, visits: int | None = None,
-                 engagement: float | None = None, median_engagement: float | None = None) -> str:
-    """What the eye tracker and the headset saw on this paragraph, written for the system prompt,
-    with what each signal means for how to explain. Anything not measured is left out, so the model
-    never sees made-up numbers. engagement is Pope's beta / (alpha + theta) from real EEG only."""
+                 engagement: Reading | None = None) -> str:
+    """What the eye tracker and the headset saw, written for the system prompt, with what each
+    signal means for how to explain. Anything not measured is left out, so the model never sees
+    made-up numbers. engagement is the NeuroChat kernel's reading (see engagement.py), whose
+    bucket brings its own instructions."""
     seen, advice = [], []
+    ratio = None
     if dwell_ms_per_100_words:
         line = f"- Reading time: {dwell_ms_per_100_words / 1000:.0f} s per 100 words"
         if median_ms_per_100_words:
@@ -110,22 +114,22 @@ def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_
         if went_back >= 2:
             advice.append("They kept rereading, so one specific sentence or term is probably the blocker: "
                           "name the part most likely to trip someone up and explain that first.")
-    if engagement is not None and median_engagement:
-        rel = engagement / median_engagement
-        seen.append(f"- EEG engagement here: {engagement:.2f}, against {median_engagement:.2f} on the rest of the text"
-                    f" ({rel:.0%} of usual).")
-        if rel < 0.8:
-            advice.append("Their attention dropped on this paragraph, so it likely lost them rather than challenged them: "
-                          "lead with a concrete example, keep sentences short, and stay under 90 words.")
-        else:
-            advice.append("They stayed focused yet still slowed down, so the content itself is hard: "
+    if engagement is not None:
+        line, guidance = engagement_notes(engagement)
+        seen.append(line)
+        if ratio is not None and ratio >= 1.5 and engagement.bucket.name == "low":
+            advice.append("They slowed down while their attention dropped, so the paragraph lost them rather than "
+                          "challenged them: lead with a concrete example.")
+        elif ratio is not None and ratio >= 1.5:
+            advice.append("They stayed engaged yet slowed down, so the content itself is hard: "
                           "go step by step and define every technical term before using it.")
+        advice += guidance
     if not seen:
         return ""
-    notes = "\n\nWhat the eye tracker and headset measured on this paragraph:\n" + "\n".join(seen)
+    notes = "\n\nWhat the eye tracker and headset measured:\n" + "\n".join(seen)
     if advice:
         notes += "\nAdapt your explanation to this:\n" + "\n".join(f"- {a}" for a in advice)
-    return notes + "\nDon't mention these measurements unless they ask."
+    return notes + "\nNever mention the EEG, the headset or these measurements unless they ask."
 
 
 def explain_request(paragraph: str, title: str | None = None, context: str | None = None,

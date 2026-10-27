@@ -3,7 +3,7 @@
 The reading page sends an event each time the gaze settles on a paragraph or leaves the text.
 Each event is stamped with time.monotonic() when it arrives, the clock the EEG buffer uses, so
 every paragraph visit maps onto the EEG recorded during it: gaze says where, EEG says whether
-the reader was engaged there.
+the reader was engaged there. The engagement index itself is the NeuroChat kernel in engagement.py.
 """
 from __future__ import annotations
 
@@ -12,29 +12,10 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from scipy.signal import welch
+
+from .engagement import engagement_index
 
 MIN_VISIT_SECONDS = 0.3     # shorter visits are passing glances, not reading
-MIN_EEG_SECONDS = 1.0       # too little EEG for a band-power estimate
-THETA, ALPHA, BETA = (4, 8), (8, 13), (13, 30)
-
-
-def engagement_index(eeg: np.ndarray, srate: float) -> float | None:
-    """Pope et al.'s engagement index, beta / (alpha + theta), averaged over channels.
-    eeg is channels × samples in µV; None when there isn't enough of it."""
-    if eeg.ndim != 2 or eeg.shape[1] < MIN_EEG_SECONDS * srate:
-        return None
-    freqs, psd = welch(eeg - eeg.mean(axis=1, keepdims=True), fs=srate, nperseg=min(eeg.shape[1], int(2 * srate)))
-
-    def band(lo_hi):
-        lo, hi = lo_hi
-        return psd[:, (freqs >= lo) & (freqs < hi)].sum(axis=1)
-
-    denom = band(ALPHA) + band(THETA)
-    ok = denom > 0
-    if not ok.any():
-        return None
-    return float(np.mean(band(BETA)[ok] / denom[ok]))
 
 
 @dataclass
