@@ -67,7 +67,8 @@ def _free_port() -> int:
 
 @pytest.mark.skipif(not _has_playwright(), reason="needs Node and Playwright with Chromium")
 def test_study_mode_in_a_browser(tmp_path):
-    ollama = fake_ollama()
+    # A long answer, so the page has to keep the follow-up box clear of the dock.
+    ollama = fake_ollama(reply=("Main idea: ", "batteries ", "move ions.") + (" Ions slot between the layers.",) * 30)
     port = _free_port()
     server = uvicorn.Server(uvicorn.Config(create_app(SimulatedBackend(), Tutor(transport=ollama)),
                                            host="127.0.0.1", port=port, log_level="warning"))

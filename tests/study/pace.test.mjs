@@ -66,8 +66,91 @@ test("S4: slow means at least SLOW_RATIO times the usual pace, once there is a b
 });
 
 test("S1: pasted text splits into a title and paragraphs", () => {
-  assert.deepEqual(P.parseText("Batteries\n\nOne two.\nthree.\n\n  Four.  "), { title: "Batteries", paragraphs: ["One two. three.", "Four."] });
-  assert.deepEqual(P.parseText("First line.\nSecond line.\r\nThird line."), { title: null, paragraphs: ["First line.", "Second line.", "Third line."] });
-  assert.deepEqual(P.parseText("Just one paragraph"), { title: null, paragraphs: ["Just one paragraph"] });
-  assert.deepEqual(P.parseText("  \n "), { title: null, paragraphs: [] });
+  const t = (raw) => { const r = P.parseText(raw); return [r.title, r.paragraphs, r.headings]; };
+  assert.deepEqual(t("Batteries\n\nOne two.\nthree.\n\n  Four.  "), ["Batteries", ["One two. three.", "Four."], [null, null]]);
+  assert.deepEqual(t("First line.\nSecond line.\r\nThird line."), [null, ["First line.", "Second line.", "Third line."], [null, null, null]]);
+  assert.deepEqual(t("Just one paragraph"), [null, ["Just one paragraph"], [null]]);
+  assert.deepEqual(t("  \n "), [null, [], []]);
+});
+
+test("S1: Markdown headings, lists and quotes; headings label the paragraph under them", () => {
+  const r = P.parseText("# Cells\n\n## Membranes\n\nThe membrane is a bilayer of lipids.\n\n- lipids\n- proteins\n- sugars\n\n> A quoted line here.");
+  assert.equal(r.title, "Cells");
+  assert.deepEqual(r.paragraphs, ["The membrane is a bilayer of lipids.", "• lipids\n• proteins\n• sugars", "A quoted line here."]);
+  assert.deepEqual(r.headings, ["Membranes", null, null]);
+});
+
+test("S1: hard-wrapped text (from a PDF) is joined, and a wall of text is cut at sentence ends", () => {
+  const wrapped = "The membrane of a cell is made of two layers of lipid molecules that\nface each other so that their water loving heads point out and their\nwater fearing tails point in, which makes a barrier.";
+  assert.equal(P.parseText(wrapped).paragraphs.length, 1);
+  const wall = "This is a sentence of exactly ten words in it ok. ".repeat(60);
+  const parts = P.parseText(wall).paragraphs;
+  assert.equal(parts.length, 6);
+  assert.ok(parts.every((p) => p.endsWith("ok.") && P.words(p) <= 130));
+});
+
+test("S3: a new text adds to the baseline instead of replacing the last text's paragraphs", () => {
+  const store = memoryStorage();
+  const b = new P.Baseline(store);
+  b.record(0, 20000); b.record(1, 22000);
+  b.newSession();
+  b.record(0, 30000); b.record(1, 32000);
+  assert.equal(b.stats().samples, 4);
+  assert.equal(new P.Baseline(store).stats().samples, 4);
+});
+
+test("S1 (round 2): narrow PDF columns, lists, numbers, questions and stray labels keep every word", () => {
+  const column = ["The cell membrane is made of two layers of", "lipid molecules that face each other so that", "their heads point out and their tails point in,", "which makes a barrier that most charged particles", "cannot cross without help from proteins."].join("\n");
+  const c = P.parseText(column);
+  assert.deepEqual([c.title, c.paragraphs.length], [null, 1]);
+  assert.equal(P.words(c.paragraphs[0]), P.words(column), "no words dropped");
+
+  const r = P.parseText("Lab notes\n\nSteps:\n- mix\n- heat\n\n1. Weigh it.\n2. Log it.\n\nWhat happens next?\n\nThe solution turns blue.\n\nPart A\n\nPart B\n\nThe end is here.");
+  assert.equal(r.title, "Lab notes");
+  assert.deepEqual(r.paragraphs, ["Steps:\n• mix\n• heat", "1. Weigh it.\n2. Log it.", "What happens next?", "The solution turns blue.", "Part A", "The end is here."]);
+  assert.deepEqual(r.headings, [null, null, null, null, null, "Part B"]);
+});
+
+test("S2 (round 2): Chinese and Japanese are timed by characters and cut at 。", () => {
+  assert.equal(P.words("电池是一个小型化学工厂。"), 11);
+  assert.equal(P.words("バッテリーは化学の工場です。"), 13);
+  assert.equal(P.words("배터리는 작은 화학 공장입니다."), 4);
+  const zh = "电池是一个小型化学工厂，在充电时反向运行。".repeat(20);
+  const parts = P.parseText(zh).paragraphs;
+  assert.ok(parts.length > 1 && parts.every((p) => p.endsWith("。")), parts.length);
+});
+
+test("S1 (round 3): one newline between paragraphs with short labels; lists without blank lines; CJK line joins", () => {
+  const doc = P.parseText("Title of doc\nHistory\nThe company was founded in 1990 by two engineers who wanted better batteries.\nEarly years\nIt grew slowly at first, selling to labs.\nToday\nIt makes cells for phones.");
+  assert.equal(doc.title, "Title of doc");
+  assert.deepEqual(doc.headings, ["History", "Early years", "Today"]);
+  assert.equal(doc.paragraphs.length, 3);
+  assert.deepEqual(P.parseText("Do this:\n1. Weigh it.\n2. Log it.\nThen stop here.").paragraphs, ["Do this:\n1. Weigh it.\n2. Log it.", "Then stop here."]);
+  assert.deepEqual(P.parseText("Intro line here.\n\n- first item that\n  wraps onto a line\n- second").paragraphs, ["Intro line here.", "• first item that wraps onto a line\n• second"]);
+  assert.equal(P.parseText("电池是一个小型化学工厂，在充\n电时反向运行，然后再次放电，一直循环下去").paragraphs[0].includes("充电"), true);
+});
+
+test("S1 (round 4): wrapped numbered items, labels above their text, poems", () => {
+  const book = P.parseText("Chapter 4: Photosynthesis\nPlants convert light into sugar inside their chloroplasts.\nThe main stages are:\n1. Light absorption by chlorophyll in the thylakoid\nmembranes.\n2. Splitting of water.\n3. The Calvin cycle.");
+  assert.deepEqual(book.paragraphs.at(-1), "The main stages are:\n1. Light absorption by chlorophyll in the thylakoid membranes.\n2. Splitting of water.\n3. The Calvin cycle.");
+  const wiki = P.parseText("Batteries\n\nHistory\nResearch on rechargeable cells began in the 1850s with lead and acid.\n\nDesign\nGenerally a cell has two electrodes and an electrolyte between them.");
+  assert.deepEqual(wiki.headings, ["History", "Design"]);
+  assert.match(wiki.paragraphs[0], /^Research on/);
+  const poem = P.parseText("Fire and Ice\nSome say the world will end in fire,\nSome say in ice.\nFrom what I've tasted of desire\nI hold with those who favor fire.");
+  assert.equal(poem.title, "Fire and Ice");
+  assert.ok(poem.headings.every((h) => h === null), JSON.stringify(poem));
+  assert.equal(poem.paragraphs.map(P.words).reduce((a, b) => a + b), 25, "no words lost");
+});
+
+test("S1 (round 5): an unpunctuated list ends where a capitalised paragraph starts; # headings always label", () => {
+  const recipe = P.parseText("Pancakes\nIngredients\n- 2 cups flour\n- 1 tsp salt\n- 3 eggs\nMix the flour and salt in a large bowl, then whisk in the eggs one at a time.");
+  assert.deepEqual(recipe.paragraphs.slice(-2), ["• 2 cups flour\n• 1 tsp salt\n• 3 eggs", "Mix the flour and salt in a large bowl, then whisk in the eggs one at a time."]);
+  const md = P.parseText("# Notes\n\nIntro text that is long enough here.\n\n## Short bit\n\nTiny.");
+  assert.deepEqual(md.headings, [null, "Short bit"]);
+});
+
+test("S1 (round 6): a wrapped item that carries on with a capital (a name) stays in its list", () => {
+  const r = P.parseText("The congress settled several questions:\n1. The borders of France were returned to those of\nNapoleon's predecessors in 1792.\n2. The Netherlands and the Austrian\nNetherlands were united under William I.\n3. Prussia gained territory in the Rhineland.");
+  assert.equal(r.paragraphs.length, 1, JSON.stringify(r));
+  assert.match(r.paragraphs[0], /those of Napoleon's predecessors in 1792\.\n2\. The Netherlands and the Austrian Netherlands/);
 });

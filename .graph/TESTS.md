@@ -8,7 +8,7 @@ Owner: Tester.
   (CI: `.github/workflows/tests.yml`).
 - Real Qwen + Docker image smoke test: `.github/workflows/docker.yml` (on PRs; publishes on main).
 - End-to-end engagement check: `python -m companion.e2e`.
-- Browser: Playwright (preinstalled Chromium), fake camera via a face y4m; no pytest wrapper yet.
+- Browser: Playwright (preinstalled Chromium), fake camera via a face y4m. Study mode: tests/test_study.py drives tests/study/browser.mjs; `node tests/study/record.mjs <url> <dir>` records a narrated demo video.
 
 ## Covered
 
@@ -35,3 +35,4 @@ Owner: Tester.
 
 2026-10-27, main `8c81218`, graph thread: `52 passed, 1 skipped in 71.31s`.
 2026-10-27, study-mode branch on main `58ff86e`: `56 passed, 1 skipped in 72.71s` (incl. 4 study tests, Playwright run locally).
+2026-10-27, study-mode critique loop (6 rounds) on `a0b817c`+: `69 passed, 1 skipped`; pace unit tests 15/15.

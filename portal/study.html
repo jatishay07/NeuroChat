@@ -21,6 +21,7 @@
     <p class="lede">Paste what you're reading. You'll see one paragraph at a time, and NeuroChat quietly marks the ones that take you much longer than usual. Explain asks the local tutor.</p>
     <textarea id="source" rows="8" placeholder="Paste a text here. Leave a blank line between paragraphs." aria-label="Text to study"></textarea>
     <button id="startBtn" type="button" class="primary" disabled>Start reading</button>
+    <p class="skip muted" id="resume" hidden><a href="#" id="resumeBtn"></a></p>
     <p class="skip muted">Or <a href="#" id="sampleBtn">try a sample passage</a></p>
     <p class="muted small" id="paceNote"></p>
     <p class="muted small">No headset or camera needed. <a href="/eyes.html">Webcam eye tracking</a> is an optional extra.</p>
@@ -28,7 +29,7 @@
 
   <!-- 2. One paragraph at a time -->
   <div id="reader" class="study-reader" hidden>
-    <p class="eyebrow" id="where"></p>
+    <p class="eyebrow"><span id="section"></span><span id="where" class="where"></span></p>
     <h1 id="title" hidden></h1>
     <article id="para" class="study-para" aria-live="polite"></article>
     <div class="study-actions">

@@ -14,7 +14,7 @@ Owned by the `study-mode` thread; only it edits this file.
 
 ## State
 
-- Node: Reviewer → Integrator (PR).
-- Last: `[Tester] T1–T3 → tests/test_study.py 4 passed (Playwright included); full suite green → Reviewer`.
-- Retries: Tester 0/3, Reviewer 0/2.
-- Open questions: none. Threshold 1.5× is a starting value; tune once real sessions exist.
+- Node: Reviewer → Integrator (follow-up PR with the critique loop).
+- Last: `[Reviewer] 6 critique rounds (2 agents in round 1, then one per round) → converged on everything but paste-parsing nits → PR`.
+- Retries: n/a (findings were fixed and re-tested each round; every fix has a test).
+- Open questions: none. Known nits: headline/byline blocks without blank lines read as one paragraph; poems read as prose; a capital-letter wrap on the last list item is ambiguous.

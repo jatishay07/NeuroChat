@@ -5,6 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const P = window.StudyPace;
   const TEXT_KEY = "neurochat.study.text";
+  const PLACE_KEY = "neurochat.study.place"; // where you were in the saved text
   const SAMPLE = `How do batteries store energy?
 
 A battery is a small chemical factory that runs in reverse when you charge it. Inside, two different materials sit on either side of a liquid or gel. When you connect a device, one side gives up electrons and the other side takes them, and that flow of electrons through your device is the electric current.
@@ -21,9 +22,9 @@ Batteries wear out because every trip back and forth slightly damages the materi
   try { store = window.localStorage; } catch { /* storage blocked: this session only */ }
   const baseline = new P.Baseline(store);
 
-  let doc = null;      // { title, paragraphs }
+  let doc = null;      // { title, paragraphs, headings }
   let at = -1;         // paragraph on screen
-  let paras = [];      // per paragraph: { clock, words, visits, slow, chat: [{role, content}] }
+  let paras = [];      // per paragraph: { clock, words, visits, slow, frozen, collapsed, chat: [{role, content}] }
   let ws = null, busy = false, current = null, serverOn = null; // serverOn: paragraph the server's conversation is about
 
   // ---- start screen ----
@@ -42,39 +43,60 @@ Batteries wear out because every trip back and forth slightly damages the materi
     note.append(reset);
   }
 
-  $("source").oninput = () => { $("startBtn").disabled = !$("source").value.trim(); };
+  $("source").oninput = () => { $("startBtn").disabled = !$("source").value.trim(); resumeNote(); };
   $("sampleBtn").onclick = (e) => { e.preventDefault(); $("source").value = SAMPLE; begin(); };
-  $("startBtn").onclick = begin;
+  $("startBtn").onclick = () => begin();
+  $("resumeBtn").onclick = (e) => { e.preventDefault(); begin(place()?.at ?? 0); };
+  // The first click selects the saved text, so a new one replaces it in one paste; later clicks edit.
+  $("source").addEventListener("focus", () => $("source").select(), { once: true });
   $("againBtn").onclick = $("newBtn").onclick = () => { leave(); show("start"); };
   try { $("source").value = store?.getItem(TEXT_KEY) || ""; } catch { /* nothing saved */ }
   $("source").oninput();
   paceNote();
+  resumeNote();
+
+  function place() {
+    try {
+      const p = JSON.parse(store?.getItem(PLACE_KEY) || "null");
+      return p && p.text === $("source").value && p.at > 0 ? p : null;
+    } catch { return null; }
+  }
+  function savePlace() {
+    try { store?.setItem(PLACE_KEY, JSON.stringify({ text: $("source").value, at, of: paras.length })); } catch { /* fine */ }
+  }
+  function resumeNote() {
+    const p = place();
+    $("resume").hidden = !p;
+    if (p) $("resumeBtn").textContent = `Continue at paragraph ${p.at + 1} of ${p.of}`;
+  }
 
   function show(screen) {
     $("start").hidden = screen !== "start";
     $("reader").hidden = $("dock").hidden = screen !== "reader";
     $("finish").hidden = screen !== "finish";
     $("newBtn").hidden = screen !== "reader";
-    if (screen === "start") paceNote();
+    if (screen === "start") { paceNote(); resumeNote(); $("source").oninput(); }
     window.scrollTo(0, 0);
   }
 
-  function begin() {
+  function begin(from = 0) {
     const raw = $("source").value;
     doc = P.parseText(raw);
     if (!doc.paragraphs.length) return;
     try { store?.setItem(TEXT_KEY, raw); } catch { /* fine */ }
-    paras = doc.paragraphs.map((text) => ({ text, clock: new P.Clock(), words: P.words(text), visits: 0, slow: false, chat: [] }));
+    paras = doc.paragraphs.map((text, i) => ({ text, heading: doc.headings[i], clock: new P.Clock(), words: P.words(text), visits: 0, slow: false, chat: [] }));
     $("title").textContent = doc.title || "";
     $("title").hidden = !doc.title;
     at = -1;
     serverOn = null;
+    baseline.newSession();
     show("reader");
-    go(0);
+    go(Math.min(from, paras.length - 1));
   }
 
   // ---- moving between paragraphs ----
-  function value(i) { return P.msPer100Words(paras[i].clock.elapsed(), paras[i].words); }
+  // A paragraph's pace stops at Explain: time spent reading the tutor's answer isn't reading the paragraph.
+  function value(i) { return paras[i].frozen !== undefined ? paras[i].frozen : P.msPer100Words(paras[i].clock.elapsed(), paras[i].words); }
 
   function leave() {
     if (at < 0 || !paras[at]) return;
@@ -92,6 +114,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     at = i;
     const p = paras[i];
     p.visits++;
+    $("section").textContent = p.heading || "";
     $("where").textContent = `Paragraph ${i + 1} of ${paras.length}`;
     $("title").hidden = !doc.title || i > 0;
     $("para").textContent = p.text;
@@ -105,6 +128,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     renderChat();
     mark();
     if (!document.hidden) p.clock.start();
+    savePlace();
     window.scrollTo(0, 0);
   }
 
@@ -125,9 +149,12 @@ Batteries wear out because every trip back and forth slightly damages the materi
   function finish() {
     leave();
     const slow = paras.map((p, i) => ({ ...p, i })).filter((p) => p.slow);
+    // Only paragraphs that were actually read (timed) count; skimmed ones don't.
+    const read = paras.filter((p, i) => value(i)).length;
+    const n = read === paras.length ? `${read} paragraph${read === 1 ? "" : "s"}` : `${read} of ${paras.length} paragraphs`;
     $("finishText").textContent = slow.length
-      ? `You read ${paras.length} paragraphs. ${slow.length === 1 ? "This one" : "These"} took you longer than usual:`
-      : `You read ${paras.length} paragraphs, none much slower than your usual pace.`;
+      ? `You read ${n}. ${slow.length === 1 ? "This one" : "These"} took you longer than usual:`
+      : `You read ${n}, none much slower than your usual pace.`;
     $("slowList").replaceChildren(...slow.map((p) => {
       const li = document.createElement("li");
       const b = document.createElement("button");
@@ -138,6 +165,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
       li.append(b);
       return li;
     }));
+    try { store?.removeItem(PLACE_KEY); } catch { /* fine */ }
     show("finish");
   }
 
@@ -145,33 +173,54 @@ Batteries wear out because every trip back and forth slightly damages the materi
   $("nextBtn").onclick = () => go(at + 1);
 
   // Scrolling moves between paragraphs once the page itself can't scroll further that way (a long
-  // explanation scrolls first). One move per gesture.
-  let wheel = 0, lockUntil = 0;
+  // paragraph or explanation scrolls first). One move per gesture: a trackpad flick keeps sending
+  // events for a second or two of inertia, so a gesture only ends after GAP ms without any.
+  const GAP = 250, PULL = 150;
+  let wheel = 0, lastWheel = 0, moved = false, startEdge = false;
   const atEdge = (down) => down
     ? window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
     : window.scrollY <= 0;
   function nudge(delta) {
-    if ($("reader").hidden || Date.now() < lockUntil || !atEdge(delta > 0)) { wheel = 0; return; }
+    const now = Date.now();
+    if (now - lastWheel > GAP) {
+      // A new gesture. Mouse-wheel notches are separate gestures, so the pull adds up across
+      // notches for a second; a gesture that started mid-page only scrolls (you rest on the last
+      // lines before the next one turns the page).
+      if (now - lastWheel > 1000 || Math.sign(delta) !== Math.sign(wheel)) wheel = 0;
+      moved = false;
+      startEdge = atEdge(delta > 0);
+    }
+    lastWheel = now;
+    if ($("reader").hidden || moved || !startEdge) { wheel = 0; return; }
     wheel += delta;
-    if (Math.abs(wheel) < 80) return;
-    lockUntil = Date.now() + 700;
+    if (Math.abs(wheel) < PULL) return;
+    moved = true;
     const down = wheel > 0;
-    wheel = 0;
+    wheel = 0; // a turn uses up the pull
     go(at + (down ? 1 : -1));
   }
-  window.addEventListener("wheel", (e) => { if (!e.target.closest?.(".chat")) nudge(e.deltaY); }, { passive: true });
+  window.addEventListener("wheel", (e) => nudge(e.deltaY), { passive: true });
   let touchY = null;
-  window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  let touchEdges = null;
+  window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; touchEdges = [atEdge(false), atEdge(true)]; }, { passive: true });
   window.addEventListener("touchend", (e) => {
     if (touchY === null) return;
     const dy = touchY - e.changedTouches[0].clientY;
     touchY = null;
-    if (Math.abs(dy) > 60) { lockUntil = 0; wheel = 0; nudge(dy > 0 ? 100 : -100); }
+    // Only a swipe that started at the edge turns the page.
+    if (Math.abs(dy) > 60 && touchEdges[dy > 0 ? 1 : 0] && !$("reader").hidden) go(at + (dy > 0 ? 1 : -1));
   }, { passive: true });
   window.addEventListener("keydown", (e) => {
-    if ($("reader").hidden || e.target.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (["ArrowRight", "ArrowDown", "PageDown", "j"].includes(e.key) || (e.key === " " && !e.shiftKey && !e.target.closest("button"))) { e.preventDefault(); go(at + 1); }
-    else if (["ArrowLeft", "ArrowUp", "PageUp", "k"].includes(e.key)) { e.preventDefault(); go(at - 1); }
+    if (e.target.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!$("finish").hidden && ["ArrowLeft", "k"].includes(e.key)) { show("reader"); go(paras.length - 1); return; }
+    if ($("reader").hidden) return;
+    // ←/→ and j/k always move; ↓/↑, Page keys and Space scroll a tall page first, like the wheel.
+    const scrolls = { ArrowDown: 1, PageDown: 1, " ": 1, ArrowUp: -1, PageUp: -1 }[e.key];
+    if (e.key === " " && (e.shiftKey || e.target.closest("button, a"))) return;
+    const dir = scrolls || { ArrowRight: 1, j: 1, ArrowLeft: -1, k: -1 }[e.key];
+    if (!dir || (scrolls && !atEdge(dir > 0))) return;
+    e.preventDefault();
+    go(at + dir);
   });
 
   // Only active, visible time counts (study-pace.js Clock).
@@ -183,7 +232,12 @@ Batteries wear out because every trip back and forth slightly damages the materi
     if (!c) return;
     if (document.hidden) c.stop(); else c.start();
   });
-  window.addEventListener("pagehide", () => { if (at >= 0) { paras[at].clock.stop(); baseline.record(at, value(at)); paras[at].clock.start(); } });
+  window.addEventListener("pagehide", () => {
+    if (at < 0) return;
+    paras[at].clock.stop();
+    baseline.record(at, value(at));
+    if (!document.hidden) paras[at].clock.start(); // back/forward cache can bring the page back
+  });
 
   // ---- the tutor (/ws/chat, owned by the side chat; see .graph/CONTRACTS.md) ----
   async function checkStatus() {
@@ -223,8 +277,25 @@ Batteries wear out because every trip back and forth slightly damages the materi
       if (m.error) el.replaceChildren(errorText(m.content));
       if (m === current?.msg) { current.el = el; el.classList.add("typing"); }
     }
-    $("tutor").hidden = !p.chat.length;
+    $("tutor").hidden = !p.chat.length || p.collapsed;
     $("askForm").hidden = busy || !p.chat.some((m) => m.role === "assistant" && !m.error);
+    // Explain asks once; with an answer open it asks for another take; after "Got it" it shows the answer again.
+    const answered = p.chat.some((m) => m.role === "assistant" && !m.error && m !== current?.msg);
+    $("explainBtn").textContent = !p.chat.length || (!answered && current?.para === p) ? "Explain" : !answered ? "Try again" : p.collapsed ? "Show explanation" : "Explain again";
+  }
+
+  // As the answer grows, follow it like a chat does, keeping its bottom (and the follow-up box)
+  // above the dock, unless the reader has scrolled the answer out of sight.
+  // Following = the answer's bottom is on screen above the dock (they haven't scrolled up to reread).
+  function following() {
+    const t = $("tutor");
+    return !t.hidden && t.getBoundingClientRect().bottom <= window.innerHeight - 60;
+  }
+  function keepInView() {
+    const t = $("tutor");
+    if (t.hidden) return;
+    const r = t.getBoundingClientRect(), limit = window.innerHeight - 100;
+    if (r.top < window.innerHeight && r.bottom > limit) window.scrollBy(0, r.bottom - limit);
   }
 
   function errorText(msg) {
@@ -240,7 +311,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     if (e.type === "start") return;
     if (e.type === "token") {
       msg.content += e.text;
-      if (current.el?.isConnected) current.el.textContent = msg.content;
+      if (current.el?.isConnected) { const follow = following(); current.el.textContent = msg.content; if (follow) keepInView(); }
       return;
     }
     if (e.type === "done" || e.type === "error") {
@@ -253,7 +324,11 @@ Batteries wear out because every trip back and forth slightly damages the materi
       busy = false;
       $("explainBtn").disabled = false;
       $("askBtn").disabled = false;
-      if (para === paras[at]) renderChat();
+      if (at >= 0) { const follow = following(); renderChat(); if (follow) keepInView(); }
+      // Keyboard focus was on the (disabled) Explain button: carry it on to the follow-up box.
+      if (para === paras[at] && (document.activeElement === document.body || document.activeElement === $("explainBtn"))) {
+        ($("askForm").hidden ? $("explainBtn") : $("askInput")).focus({ preventScroll: true });
+      }
     }
   }
 
@@ -262,7 +337,9 @@ Batteries wear out because every trip back and forth slightly damages the materi
     busy = true;
     $("explainBtn").disabled = true;
     $("askBtn").disabled = true;
-    const p = paras[at];
+    const idx = at; // the reader may move on while the socket connects
+    const p = paras[idx];
+    p.chat = p.chat.filter((m) => !m.error); // a retry replaces the last error
     p.chat.push({ role: "user", content: msg.text || msg.paragraph, shown });
     const reply = { role: "assistant", content: "" };
     p.chat.push(reply);
@@ -270,20 +347,21 @@ Batteries wear out because every trip back and forth slightly damages the materi
     renderChat();
     $("tutor").scrollIntoView({ block: "nearest", behavior: "smooth" });
     const sock = await connect();
-    // A follow-up on a paragraph the server isn't on: give it that paragraph's conversation back first.
-    if (msg.type === "ask" && serverOn !== at && p.chat.length > 2) {
+    // Carrying on a paragraph's conversation the server isn't on: give it that conversation back first.
+    if ((msg.type === "ask" || msg.append) && serverOn !== idx && p.chat.length > 2) {
       const past = p.chat.slice(0, -2).filter((m) => !m.error).map(({ role, content }) => ({ role, content }));
       sock.send(JSON.stringify({ type: "load", messages: past, mode: "explain", title: doc.title || undefined }));
     }
     sock.send(JSON.stringify(msg));
-    serverOn = at;
+    serverOn = idx;
   }
 
   $("explainBtn").onclick = () => {
     const p = paras[at];
     if (!p || busy) return;
-    p.chat = [];
+    if (p.collapsed) { p.collapsed = false; renderChat(); return; }
     const { median, samples } = baseline.stats(at);
+    if (p.frozen === undefined) { p.frozen = value(at); p.clock.stop(); }
     const dwell = value(at);
     const msg = { type: "explain", paragraph: p.text, index: at };
     if (doc.title) msg.title = doc.title;
@@ -291,10 +369,11 @@ Batteries wear out because every trip back and forth slightly damages the materi
     if (dwell) msg.dwellMsPer100Words = dwell;
     if (median && samples >= P.MIN_SAMPLES) msg.medianMsPer100Words = median;
     if (p.visits > 1) msg.rereads = p.visits - 1;
+    if (p.chat.some((m) => m.role === "assistant" && !m.error)) msg.append = true; // another take, same conversation
     checkStatus();
-    send(msg, `Explain paragraph ${at + 1}`);
+    send(msg, msg.append ? "Explain it another way" : `Explain paragraph ${at + 1}`);
   };
-  $("doneBtn").onclick = () => { $("tutor").hidden = true; };
+  $("doneBtn").onclick = () => { if (paras[at]) { paras[at].collapsed = true; renderChat(); } };
   $("askForm").onsubmit = (ev) => {
     ev.preventDefault();
     const text = $("askInput").value.trim();
@@ -304,5 +383,5 @@ Batteries wear out because every trip back and forth slightly damages the materi
   };
 
   // Test hook (tests/study): read-only view of the state.
-  window.studyState = () => ({ at, slow: paras.map((p) => p.slow), baseline: baseline.values(), stats: baseline.stats(at) });
+  window.studyState = () => ({ at, pace: at >= 0 ? value(at) : null, slow: paras.map((p) => p.slow), baseline: baseline.values(), stats: baseline.stats(at) });
 })();
