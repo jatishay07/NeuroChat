@@ -85,7 +85,7 @@ Before Planner writes the spec and before Researcher goes to the web:
   `eeg`, `eye track`, `ollama`, `qwen`). `raw/conversations/` holds captured Claude sessions.
 - **Read** anything relevant. Prior decisions, past failures and existing designs in the vault override
   assumptions.
-- Record what was found (or that nothing was found) at the top of `RESEARCH.md`.
+- Record what was found (or that nothing was found) at the top of `RESEARCH.md`. **This repo is public:** summarise personal facts from the vault as "the owner's notes", never copy them.
 
 At the end of every major milestone, **write back** a short note: what was built, what failed, what was
 learned, links to the repo and PRs. Do it on a branch of `jatishay07/brain` and open a PR there:

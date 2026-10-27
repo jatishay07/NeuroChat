@@ -5,9 +5,7 @@ Owner: Researcher. Every source logged.
 ## Brain (jatishay07/brain) — searched 2026-10-27
 
 - `rg -i "neurochat|2503.07599"` over the vault: **no NeuroChat notes, no captured sessions** about it.
-- Found: `wiki/longhorn-neurotech-application.md` — Atishay was accepted 2026-09-24 onto the Longhorn
-  Neurotech **NeuroAI software subteam** (a self-driving rover with EEG control). This is why the
-  eye/jaw detectors must stay reusable.
+- Found: only the owner's own notes on the team project this work feeds (kept in the vault, not here).
 - Action: project page `wiki/neuroai-neurochat.md` written back to the vault (brain PR, 2026-10-27).
 
 ## Primary sources

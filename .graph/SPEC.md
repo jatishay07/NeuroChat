@@ -7,8 +7,8 @@ Owner: Planner. Everyone reads it. Seeded 2026-10-27 from the Reading Signals Pl
 
 A reading tutor that notices which paragraph you are struggling with and explains it again with a
 local model (Qwen 3.5 4B on Ollama), running entirely on your own computer. It serves two users:
-Atishay's own reading tutor, and the Longhorn Neurotech NeuroAI team (keep the eye and jaw detectors
-reusable for their EEG-controlled rover).
+the owner's own reading, and a student neurotech team (keep the eye and jaw detectors reusable for
+an EEG-controlled rover).
 
 The 2026-10-27 rethink reordered the work: **the no-hardware study mode ships first**. The Muse S
 Athena headset is an optional add-on, and only if Phase 1 shows its forehead sensors can see the

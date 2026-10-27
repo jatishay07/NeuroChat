@@ -16,3 +16,4 @@ date | node | decision | why | alternatives rejected
 2026-10-27 | Planner | Headset role if it earns a place: quiet underline of the suspect line only; needs slow line AND reread-sized backward jump | debate thread converged; popups interrupt | mid-line regressions, sweep counts, key-tap labels
 2026-10-27 | Planner | Phase 1 data: Atishay downloads csv_raw.zip from Zenodo 14860668 and uploads it | Zenodo blocked from the sandbox | GitHub Actions download
 2026-10-27 | Planner | Adopt the graph engineering contract (CLAUDE.md, .graph/) for every thread; Integrator = graph thread | Atishay asked for looped build→test→iterate and inter-thread messaging | ad-hoc ownership via memory only
+2026-10-27 | Integrator | .graph/ and CLAUDE.md carry no personal facts from the brain vault; refer to "the owner's notes" | repo is going public (public-repo thread) | copying vault facts into the repo
