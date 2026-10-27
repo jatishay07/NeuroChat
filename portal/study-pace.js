@@ -13,7 +13,13 @@
   const MIN_MS = 1500;       // shorter than this is a skip, not a reading
   const MAX_MS_PER_100 = 180000; // over 3 min per 100 words: they walked away, so it isn't a reading
 
-  const words = (text) => (String(text).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+  // Words; Chinese and Japanese don't put spaces between words, so each Han or kana character
+  // counts as one (reading speeds in characters per minute are close to English words per minute).
+  const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+  const words = (text) => {
+    const t = String(text);
+    return (t.replace(CJK, " ").match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length + (t.match(CJK) || []).length;
+  };
 
   // ms on screen normalised to 100 words; null when the paragraph is too short or barely looked at.
   function msPer100Words(ms, wordCount) {
@@ -99,14 +105,17 @@
   // broken mid-sentence), Markdown headings, quotes and lists. Very long paragraphs are cut at
   // sentence ends, so every screenful is timed and one wall of text still builds a baseline.
   const LONG = 180, CHUNK = 120;
-  const HEADING = /^#{1,6}\s+/, ITEM = /^\s*(?:[-*•+]|\d+[.)])\s+/;
-  const ends = (l) => /[.!?:;"”’')\]]$/.test(l);
+  const HEADING = /^#{1,6}\s+/, ITEM = /^\s*(?:[-*•+]|\d+[.)])\s+/, NUMBERED = /^\s*\d+[.)]\s+/;
+  const ends = (l) => /[.!?:;"”’')\]。！？」』]$/.test(l);
+  const bullet = (l) => NUMBERED.test(l) ? l.trim() : `• ${l.replace(ITEM, "")}`;
   // A short line not ending like a sentence ("How do batteries store energy?" is a title, "Four." is not).
-  const isHeading = (b) => HEADING.test(b) || (!b.includes("\n") && words(b) <= 10 && !/[.:;,]$/.test(b) && !ITEM.test(b));
+  // A question can be the title ("How do batteries store energy?") but not a section label mid-text.
+  const isHeading = (b, first) => HEADING.test(b) || (!b.includes("\n") && words(b) <= 10 && !ITEM.test(b)
+    && !(first ? /[.:;,。]$/ : /[.:;,!?。！？]$/).test(b));
 
   function chunk(text) {
     if (words(text) <= LONG) return [text];
-    const sentences = text.match(/[^.!?]+(?:[.!?]+["”’')\]]*\s*|$)/g) || [text];
+    const sentences = text.match(/[^.!?。！？]+(?:[.!?。！？]+["”’')\]」』]*\s*|$)/g) || [text];
     const out = [];
     let cur = "";
     for (const sn of sentences) {
@@ -124,7 +133,8 @@
     else {
       const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
       // One paragraph per line, unless the lines are a hard-wrapped text broken mid-sentence.
-      const whole = lines.filter((l) => ends(l) || l.length <= 60 || ITEM.test(l) || HEADING.test(l)).length;
+      // Decided by how lines end, not how long they are: narrow PDF columns are short but end mid-sentence.
+      const whole = lines.filter((l) => ends(l) || ITEM.test(l) || HEADING.test(l)).length;
       blocks = lines.length > 1 && whole / lines.length < 0.6 ? [lines.join("\n")] : lines;
     }
     blocks = blocks.map((b) => b.split("\n").map((l) => l.trim().replace(/^>\s?/, "")).filter(Boolean).join("\n")).filter(Boolean);
@@ -132,12 +142,15 @@
     const items = []; // { heading } or { text }
     for (const b of blocks) {
       const lines = b.split("\n");
-      if (HEADING.test(lines[0]) || (lines.length === 1 && isHeading(b))) {
+      if (HEADING.test(lines[0]) || (lines.length === 1 && isHeading(b, !items.length))) {
         items.push({ heading: lines[0].replace(HEADING, "").trim() });
         lines.shift();
         if (!lines.length) continue;
       }
-      if (lines.every((l) => ITEM.test(l))) items.push({ text: lines.map((l) => `• ${l.replace(ITEM, "")}`).join("\n") });
+      // A list, maybe with its lead-in line ("Steps:"), keeps one item per line.
+      if (lines.length > 1 && lines.slice(1).every((l) => ITEM.test(l))) {
+        items.push({ text: [ITEM.test(lines[0]) ? bullet(lines[0]) : lines[0], ...lines.slice(1).map(bullet)].join("\n") });
+      } else if (lines.length === 1 && ITEM.test(lines[0])) items.push({ text: bullet(lines[0]) });
       else for (const c of chunk(lines.join(" "))) items.push({ text: c });
     }
     // Nothing but short lines: they're the text, not headings.
@@ -147,11 +160,17 @@
     const paragraphs = [], headings = [];
     let pending = null;
     for (const it of items) {
-      if (it.heading !== undefined) { pending = it.heading; continue; }
+      if (it.heading !== undefined) {
+        // Two labels in a row: the first had nothing under it, so it was text after all.
+        if (pending !== null) { paragraphs.push(pending); headings.push(null); }
+        pending = it.heading;
+        continue;
+      }
       paragraphs.push(it.text);
       headings.push(pending);
       pending = null;
     }
+    if (pending !== null) { paragraphs.push(pending); headings.push(null); }
     return { title, paragraphs, headings };
   }
 

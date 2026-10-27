@@ -43,11 +43,12 @@ Batteries wear out because every trip back and forth slightly damages the materi
     note.append(reset);
   }
 
-  $("source").oninput = () => { $("startBtn").disabled = !$("source").value.trim(); };
+  $("source").oninput = () => { $("startBtn").disabled = !$("source").value.trim(); resumeNote(); };
   $("sampleBtn").onclick = (e) => { e.preventDefault(); $("source").value = SAMPLE; begin(); };
   $("startBtn").onclick = () => begin();
-  $("resumeBtn").onclick = (e) => { e.preventDefault(); begin(place().at); };
-  $("source").onfocus = () => $("source").select(); // a new text replaces the old one in one paste
+  $("resumeBtn").onclick = (e) => { e.preventDefault(); begin(place()?.at ?? 0); };
+  // The first click selects the saved text, so a new one replaces it in one paste; later clicks edit.
+  $("source").addEventListener("focus", () => $("source").select(), { once: true });
   $("againBtn").onclick = $("newBtn").onclick = () => { leave(); show("start"); };
   try { $("source").value = store?.getItem(TEXT_KEY) || ""; } catch { /* nothing saved */ }
   $("source").oninput();
@@ -175,15 +176,22 @@ Batteries wear out because every trip back and forth slightly damages the materi
   // paragraph or explanation scrolls first). One move per gesture: a trackpad flick keeps sending
   // events for a second or two of inertia, so a gesture only ends after GAP ms without any.
   const GAP = 250, PULL = 150;
-  let wheel = 0, lastWheel = 0, moved = false;
+  let wheel = 0, lastWheel = 0, moved = false, startEdge = false;
   const atEdge = (down) => down
     ? window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
     : window.scrollY <= 0;
   function nudge(delta) {
     const now = Date.now();
-    if (now - lastWheel > GAP) { wheel = 0; moved = false; } // a new gesture
+    if (now - lastWheel > GAP) {
+      // A new gesture. Mouse-wheel notches are separate gestures, so the pull adds up across
+      // notches for a second; a gesture that started mid-page only scrolls (you rest on the last
+      // lines before the next one turns the page).
+      if (now - lastWheel > 1000 || Math.sign(delta) !== Math.sign(wheel)) wheel = 0;
+      moved = false;
+      startEdge = atEdge(delta > 0);
+    }
     lastWheel = now;
-    if ($("reader").hidden || moved || !atEdge(delta > 0)) { wheel = 0; return; }
+    if ($("reader").hidden || moved || !startEdge) { wheel = 0; return; }
     wheel += delta;
     if (Math.abs(wheel) < PULL) return;
     moved = true;
@@ -191,12 +199,14 @@ Batteries wear out because every trip back and forth slightly damages the materi
   }
   window.addEventListener("wheel", (e) => { if (!e.target.closest?.(".chat")) nudge(e.deltaY); }, { passive: true });
   let touchY = null;
-  window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  let touchEdges = null;
+  window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; touchEdges = [atEdge(false), atEdge(true)]; }, { passive: true });
   window.addEventListener("touchend", (e) => {
     if (touchY === null) return;
     const dy = touchY - e.changedTouches[0].clientY;
     touchY = null;
-    if (Math.abs(dy) > 60) { lastWheel = 0; nudge(dy > 0 ? PULL : -PULL); }
+    // Only a swipe that started at the edge turns the page.
+    if (Math.abs(dy) > 60 && touchEdges[dy > 0 ? 1 : 0] && !$("reader").hidden) go(at + (dy > 0 ? 1 : -1));
   }, { passive: true });
   window.addEventListener("keydown", (e) => {
     if (e.target.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -268,7 +278,22 @@ Batteries wear out because every trip back and forth slightly damages the materi
     $("tutor").hidden = !p.chat.length || p.collapsed;
     $("askForm").hidden = busy || !p.chat.some((m) => m.role === "assistant" && !m.error);
     // Explain asks once; with an answer open it asks for another take; after "Got it" it shows the answer again.
-    $("explainBtn").textContent = !p.chat.length ? "Explain" : p.collapsed ? "Show explanation" : "Explain again";
+    const answered = p.chat.some((m) => m.role === "assistant" && !m.error);
+    $("explainBtn").textContent = !p.chat.length ? "Explain" : !answered ? "Try again" : p.collapsed ? "Show explanation" : "Explain again";
+  }
+
+  // As the answer grows, follow it like a chat does, keeping its bottom (and the follow-up box)
+  // above the dock, unless the reader has scrolled the answer out of sight.
+  // Following = the answer's bottom is on screen above the dock (they haven't scrolled up to reread).
+  function following() {
+    const t = $("tutor");
+    return !t.hidden && t.getBoundingClientRect().bottom <= window.innerHeight - 60;
+  }
+  function keepInView() {
+    const t = $("tutor");
+    if (t.hidden) return;
+    const r = t.getBoundingClientRect(), limit = window.innerHeight - 100;
+    if (r.top < window.innerHeight && r.bottom > limit) window.scrollBy(0, r.bottom - limit);
   }
 
   function errorText(msg) {
@@ -284,7 +309,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     if (e.type === "start") return;
     if (e.type === "token") {
       msg.content += e.text;
-      if (current.el?.isConnected) current.el.textContent = msg.content;
+      if (current.el?.isConnected) { const follow = following(); current.el.textContent = msg.content; if (follow) keepInView(); }
       return;
     }
     if (e.type === "done" || e.type === "error") {
@@ -297,9 +322,11 @@ Batteries wear out because every trip back and forth slightly damages the materi
       busy = false;
       $("explainBtn").disabled = false;
       $("askBtn").disabled = false;
-      if (at >= 0) renderChat();
+      if (at >= 0) { const follow = following(); renderChat(); if (follow) keepInView(); }
       // Keyboard focus was on the (disabled) Explain button: carry it on to the follow-up box.
-      if (para === paras[at] && (document.activeElement === document.body || document.activeElement === $("explainBtn")) && !$("askForm").hidden) $("askInput").focus({ preventScroll: true });
+      if (para === paras[at] && (document.activeElement === document.body || document.activeElement === $("explainBtn"))) {
+        ($("askForm").hidden ? $("explainBtn") : $("askInput")).focus({ preventScroll: true });
+      }
     }
   }
 
@@ -310,6 +337,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     $("askBtn").disabled = true;
     const idx = at; // the reader may move on while the socket connects
     const p = paras[idx];
+    p.chat = p.chat.filter((m) => !m.error); // a retry replaces the last error
     p.chat.push({ role: "user", content: msg.text || msg.paragraph, shown });
     const reply = { role: "assistant", content: "" };
     p.chat.push(reply);

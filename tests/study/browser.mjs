@@ -69,7 +69,7 @@ try {
   await page.getByRole("button", { name: "Explain" }).click();
   await page.locator("#chat .msg.tutor:not(.typing)").waitFor();
   const answer = await page.locator("#chat .msg.tutor").textContent();
-  assert.equal(answer, "Main idea: batteries move ions.");
+  assert.match(answer, /^Main idea: batteries move ions\. Ions slot/);
   const explain = sent.find((m) => m.type === "explain");
   assert.equal(explain.index, 3);
   assert.ok(explain.dwellMsPer100Words > 40000, JSON.stringify(explain));
@@ -80,6 +80,9 @@ try {
   await page.locator("#askInput").press("Enter");
   await page.waitForFunction(() => document.querySelectorAll("#chat .msg.tutor:not(.typing)").length === 2);
   seen.explain = explain;
+  // The follow-up box stays above the floating dock as the long answer streams in.
+  const [askBottom, dockTop] = await page.evaluate(() => [document.getElementById("askForm").getBoundingClientRect().bottom, document.getElementById("dock").getBoundingClientRect().top]);
+  assert.ok(askBottom <= dockTop, `ask box ${askBottom} under the dock ${dockTop}`);
   // Reading the answer doesn't count as reading the paragraph.
   await page.clock.fastForward(50000);
   assert.equal(await page.evaluate(() => window.studyState().pace), explain.dwellMsPer100Words);
@@ -116,6 +119,8 @@ try {
   // Resume: reload mid-text offers to continue where you were.
   await page.reload();
   assert.equal(await page.locator("#resumeBtn").textContent(), "Continue at paragraph 2 of 2");
+  await page.locator("#source").fill("Something else entirely.");
+  assert.equal(await page.locator("#resume").isVisible(), false, "the resume link goes with the text it was for");
   const tall = "Long text\n\n" + Array.from({ length: 4 }, (_, k) => `Paragraph ${k} begins. ` + "This sentence keeps going so the paragraph is tall on screen. ".repeat(14)).join("\n\n");
   await page.locator("#source").fill(tall);
   await page.locator("#startBtn").click();
@@ -124,8 +129,19 @@ try {
   await page.setViewportSize({ width: 1280, height: 1600 });
   await page.mouse.move(600, 400);
   for (let k = 0; k < 120; k++) { await page.mouse.wheel(0, Math.max(4, 120 * Math.exp(-k / 30))); await page.clock.fastForward(16); }
+  await page.waitForTimeout(150); // let the last queued wheel events land
   assert.equal((await page.evaluate(() => window.studyState())).at, 1, "one flick, one paragraph");
   seen.flick = "120 wheel events over 2 s → 1 move";
+  // A plain mouse wheel: notches 400 ms apart add up, two notches turn the page.
+  await page.clock.fastForward(1500);
+  await page.mouse.wheel(0, 100);
+  await page.waitForTimeout(100);
+  await page.clock.fastForward(400);
+  assert.equal((await page.evaluate(() => window.studyState())).at, 1, "one notch is not enough");
+  await page.mouse.wheel(0, 100);
+  await page.waitForTimeout(100);
+  assert.equal((await page.evaluate(() => window.studyState())).at, 2, "two notches turn the page");
+  await page.keyboard.press("ArrowLeft");
 
   // A paragraph taller than the window: ↓ scrolls it first and only then moves on.
   await page.setViewportSize({ width: 390, height: 500 });
@@ -134,6 +150,11 @@ try {
   await page.waitForTimeout(400); // the browser's own smooth scroll
   assert.equal((await page.evaluate(() => window.studyState())).at, 1, "↓ scrolled the page instead of skipping");
   assert.ok(await page.evaluate(() => window.scrollY > 0));
+  // One long wheel gesture that starts mid-paragraph scrolls to the end but doesn't also turn the page.
+  await page.clock.fastForward(1500);
+  for (let k = 0; k < 40; k++) { await page.mouse.wheel(0, 120); await page.clock.fastForward(16); }
+  await page.waitForTimeout(300);
+  assert.equal((await page.evaluate(() => window.studyState())).at, 1, "rested on the last lines");
   await page.keyboard.press("End");
   await page.waitForTimeout(400);
   await page.keyboard.press("ArrowDown");

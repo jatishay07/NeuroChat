@@ -98,3 +98,24 @@ test("S3: a new text adds to the baseline instead of replacing the last text's p
   assert.equal(b.stats().samples, 4);
   assert.equal(new P.Baseline(store).stats().samples, 4);
 });
+
+test("S1 (round 2): narrow PDF columns, lists, numbers, questions and stray labels keep every word", () => {
+  const column = ["The cell membrane is made of two layers of", "lipid molecules that face each other so that", "their heads point out and their tails point in,", "which makes a barrier that most charged particles", "cannot cross without help from proteins."].join("\n");
+  const c = P.parseText(column);
+  assert.deepEqual([c.title, c.paragraphs.length], [null, 1]);
+  assert.equal(P.words(c.paragraphs[0]), P.words(column), "no words dropped");
+
+  const r = P.parseText("Lab notes\n\nSteps:\n- mix\n- heat\n\n1. Weigh it.\n2. Log it.\n\nWhat happens next?\n\nThe solution turns blue.\n\nPart A\n\nPart B\n\nThe end is here.");
+  assert.equal(r.title, "Lab notes");
+  assert.deepEqual(r.paragraphs, ["Steps:\n• mix\n• heat", "1. Weigh it.\n2. Log it.", "What happens next?", "The solution turns blue.", "Part A", "The end is here."]);
+  assert.deepEqual(r.headings, [null, null, null, null, null, "Part B"]);
+});
+
+test("S2 (round 2): Chinese and Japanese are timed by characters and cut at 。", () => {
+  assert.equal(P.words("电池是一个小型化学工厂。"), 11);
+  assert.equal(P.words("バッテリーは化学の工場です。"), 13);
+  assert.equal(P.words("배터리는 작은 화학 공장입니다."), 4);
+  const zh = "电池是一个小型化学工厂，在充电时反向运行。".repeat(20);
+  const parts = P.parseText(zh).paragraphs;
+  assert.ok(parts.length > 1 && parts.every((p) => p.endsWith("。")), parts.length);
+});
