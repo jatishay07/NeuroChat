@@ -39,3 +39,8 @@ Each thread adds a `### <thread-id>` section here: current node, last handoff li
 
 ### graph
 - Node: Integrator. Last: `[Builder] seed CLAUDE.md + .graph → PR opened → Integrator`.
+
+### side-chat
+- Node: idle (no task). Last: `[Integrator] PR #22 per-page memory + Gemini side panel → merged → idle`.
+- Retries: none open. Waiting on: Atishay's answer on side chat outside Chrome; eye-tracking for
+  `neurochat:slow` on any page.
