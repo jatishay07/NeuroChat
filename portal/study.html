@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeuroChat · Study mode</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="tutor.css">
+  <link rel="stylesheet" href="study.css">
+</head>
+<body class="study">
+  <header class="top">
+    <a class="brand" href="/">NeuroChat</a>
+    <button id="newBtn" type="button" class="quiet" hidden>New text</button>
+  </header>
+
+  <!-- 1. Paste a text -->
+  <main class="card" id="start">
+    <h1>Study mode</h1>
+    <p class="lede">Paste what you're reading. You'll see one paragraph at a time, and NeuroChat quietly marks the ones that take you much longer than usual. Explain asks the local tutor.</p>
+    <textarea id="source" rows="8" placeholder="Paste a text here. Leave a blank line between paragraphs." aria-label="Text to study"></textarea>
+    <button id="startBtn" type="button" class="primary" disabled>Start reading</button>
+    <p class="skip muted">Or <a href="#" id="sampleBtn">try a sample passage</a></p>
+    <p class="muted small" id="paceNote"></p>
+    <p class="muted small">No headset or camera needed. <a href="/eyes.html">Webcam eye tracking</a> is an optional extra.</p>
+  </main>
+
+  <!-- 2. One paragraph at a time -->
+  <div id="reader" class="study-reader" hidden>
+    <p class="eyebrow" id="where"></p>
+    <h1 id="title" hidden></h1>
+    <article id="para" class="study-para" aria-live="polite"></article>
+    <div class="study-actions">
+      <button id="explainBtn" type="button" class="quiet explain">Explain</button>
+      <span id="cue" class="cue" hidden><i></i>Slower than your usual pace</span>
+    </div>
+    <section id="tutor" class="tutor" aria-live="polite" hidden>
+      <div class="tutor-head">
+        <span id="tutorStatus" class="muted small"></span>
+        <button id="doneBtn" type="button" class="quiet">Got it</button>
+      </div>
+      <div id="chat" class="chat"></div>
+      <form id="askForm" class="ask" hidden>
+        <input id="askInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" aria-label="Ask the tutor a follow-up question">
+        <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
+      </form>
+    </section>
+  </div>
+
+  <!-- 3. Finished -->
+  <main class="card" id="finish" hidden>
+    <h1>Finished</h1>
+    <p class="lede" id="finishText"></p>
+    <ol id="slowList" class="slow-list"></ol>
+    <button id="againBtn" type="button" class="primary">Read something else</button>
+  </main>
+
+  <nav class="dock" id="dock" hidden aria-label="Paragraphs">
+    <button id="backBtn" type="button" class="quiet" aria-label="Previous paragraph">&#8249; Back</button>
+    <span id="count" class="count"></span>
+    <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+    <button id="nextBtn" type="button" class="quiet" aria-label="Next paragraph">Next &#8250;</button>
+  </nav>
+
+  <script src="study-pace.js"></script>
+  <script src="study.js"></script>
+</body>
+</html>
