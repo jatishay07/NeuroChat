@@ -17,3 +17,4 @@ date | node | decision | why | alternatives rejected
 2026-10-27 | Planner | Phase 1 data: Atishay downloads csv_raw.zip from Zenodo 14860668 and uploads it | Zenodo blocked from the sandbox | GitHub Actions download
 2026-10-27 | Planner | Adopt the graph engineering contract (CLAUDE.md, .graph/) for every thread; Integrator = graph thread | Atishay asked for looped build→test→iterate and inter-thread messaging | ad-hoc ownership via memory only
 2026-10-27 | Integrator | .graph/ and CLAUDE.md carry no personal facts from the brain vault; refer to "the owner's notes" | repo is going public (public-repo thread) | copying vault facts into the repo
+2026-10-27 | Builder (reading-signals) | Saccades found with a step filter (mean of next 130 ms minus previous 130 ms of AF8 − AF7), not a velocity threshold | on synthetic Muse EEG the velocity of alpha rhythm swamps a 5–10° step; the step filter averages rhythms out | velocity threshold (found 0 of 78 jumps at 4 µV/°)
