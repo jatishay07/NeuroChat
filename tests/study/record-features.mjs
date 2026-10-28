@@ -67,15 +67,16 @@ let s = await state();
 await say(`Only the paragraph you're on stays lit. ¶3 is dense, so it's expected to take ${(s.expected[2] / s.expected[0]).toFixed(1)}× as long as ¶1.`, 3800);
 await say("Your usual pace is seeded for this video (4 s per 100 words). I read ¶1 slowly…", 1500);
 await until(async () => (await state()).slow[0], 12000);
-await say("…slower than expected for you: a quiet amber edge. Slow alone doesn't interrupt you.", 3400);
+await say("…slower than expected for you: a quiet amber edge, nothing else. Slow alone doesn't interrupt you.", 3400);
 await page.keyboard.press("j");
-await say("I move on…", 1400);
+await say("I move on…", 3200);
 await page.keyboard.press("k");
 await say("…and go back to it. Slow on the first read, then reread: two signs that agree.", 2400);
 await answered(1);
 await say("So it's explained in the side chat by itself, knowing how slow you were and that you went back.", 4200);
+await state({ explainedAgo: 25000 }); // the 20 s it waits first, skipped for the video
 await page.keyboard.press("j");
-await pause(900);
+await say("Glancing back to check the explanation doesn't count. Still going back 20 s later (skipped here)…", 3300);
 await page.keyboard.press("k");
 await say("Still going back after the explanation? Once, it's explained a different way.", 2400);
 await answered(2);
@@ -92,7 +93,7 @@ await pause(900);
 await say("A jaw clench means \"explain this now\", slow or not.", 1400);
 await signal({ kind: "clench" });
 await answered(3);
-await say("The tutor also gets the earlier paragraphs in this section that slowed you down (“Also sent”).", 3600);
+await say("The tutor also gets the earlier paragraphs in this section that slowed you down.", 3600);
 
 await say("Read on…", 600);
 for (let k = 0; k < 3; k++) { await page.keyboard.press("j"); await pause(1600); }
