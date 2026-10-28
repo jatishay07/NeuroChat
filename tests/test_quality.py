@@ -16,7 +16,11 @@ def test_good_flat_and_noisy_channels():
     flat = np.full_like(good, 800.0)
     noisy = eeg()
     noisy[200:210] += 300  # a movement spike
-    assert channel_quality(np.vstack([good, flat, noisy]), SR) == ["good", "flat", "noisy"]
+    assert channel_quality(np.vstack([good, flat, noisy]), SR) == [
+        "good",
+        "flat",
+        "noisy",
+    ]
 
 
 def test_slow_drift_alone_is_not_noise():

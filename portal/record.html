@@ -1,67 +1,111 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NeuroChat · Recording session</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="record.css">
-</head>
-<body class="record">
-  <header class="top">
-    <span class="brand">NeuroChat</span>
-    <span class="steps" id="steps" role="img" aria-label="Step 1 of 4"><i class="on"></i><i></i><i></i><i></i></span>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroChat · Recording session</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="record.css" />
+  </head>
+  <body class="record">
+    <header class="top">
+      <span class="brand">NeuroChat</span>
+      <span class="steps" id="steps" role="img" aria-label="Step 1 of 4"
+        ><i class="on"></i><i></i><i></i><i></i
+      ></span>
+    </header>
 
-  <!-- 1. Set up -->
-  <main class="card" id="setup">
-    <p class="eyebrow">Recording session · about 20 minutes</p>
-    <h1>Read with the headset on</h1>
-    <p class="lede">A short calibration, then an easy text and a hard one, one paragraph at a time. The EEG and what's on screen are saved together on this computer, in <code>data/sessions/</code>.</p>
-    <p class="connected"><span class="dot" id="headsetDot"></span><span id="headsetText">Checking the headset…</span></p>
-    <div class="fields">
-      <label>Screen width <span class="muted">(cm, the lit area)</span><input id="screenCm" type="number" min="15" max="100" step="0.1" value="30.2"></label>
-      <label>Eyes to screen <span class="muted">(cm)</span><input id="distanceCm" type="number" min="30" max="120" step="1" value="60"></label>
-      <label class="wide">Hard text <span class="muted">(optional: paste something you're studying; blank lines split paragraphs)</span><textarea id="hardText" rows="4" placeholder="Leave empty to use the built-in hard text."></textarea></label>
+    <!-- 1. Set up -->
+    <main class="card" id="setup">
+      <p class="eyebrow">Recording session · about 20 minutes</p>
+      <h1>Read with the headset on</h1>
+      <p class="lede">
+        A short calibration, then an easy text and a hard one, one paragraph at
+        a time. The EEG and what's on screen are saved together on this
+        computer, in <code>data/sessions/</code>.
+      </p>
+      <p class="connected">
+        <span class="dot" id="headsetDot"></span
+        ><span id="headsetText">Checking the headset…</span>
+      </p>
+      <div class="fields">
+        <label
+          >Screen width <span class="muted">(cm, the lit area)</span
+          ><input
+            id="screenCm"
+            type="number"
+            min="15"
+            max="100"
+            step="0.1"
+            value="30.2"
+        /></label>
+        <label
+          >Eyes to screen <span class="muted">(cm)</span
+          ><input
+            id="distanceCm"
+            type="number"
+            min="30"
+            max="120"
+            step="1"
+            value="60"
+        /></label>
+        <label class="wide"
+          >Hard text
+          <span class="muted"
+            >(optional: paste something you're studying; blank lines split
+            paragraphs)</span
+          ><textarea
+            id="hardText"
+            rows="4"
+            placeholder="Leave empty to use the built-in hard text."
+          ></textarea>
+        </label>
+      </div>
+      <button id="startBtn" type="button" class="primary">
+        Start recording
+      </button>
+      <p class="muted small"><a href="/">Connect the headset first</a></p>
+      <p id="message" class="message" role="status"></p>
+    </main>
+
+    <!-- 2. Calibration, full screen -->
+    <div id="calib" class="calib rec-calib" hidden>
+      <p class="rec-cue" id="cue"></p>
+      <div class="rec-dot" id="dot" hidden></div>
     </div>
-    <button id="startBtn" type="button" class="primary">Start recording</button>
-    <p class="muted small"><a href="/">Connect the headset first</a></p>
-    <p id="message" class="message" role="status"></p>
-  </main>
 
-  <!-- 2. Calibration, full screen -->
-  <div id="calib" class="calib rec-calib" hidden>
-    <p class="rec-cue" id="cue"></p>
-    <div class="rec-dot" id="dot" hidden></div>
-  </div>
-
-  <!-- 3. One paragraph at a time -->
-  <div id="reading" class="rec-reading" hidden>
-    <p class="eyebrow" id="where"></p>
-    <article class="text rec-text"><p id="para"></p></article>
-    <p class="rec-script" id="script" hidden></p>
-    <div class="rec-actions">
-      <span class="muted small">Click a line you'd want explained. Space or → for the next paragraph.</span>
-      <button id="nextBtn" type="button">Next</button>
+    <!-- 3. One paragraph at a time -->
+    <div id="reading" class="rec-reading" hidden>
+      <p class="eyebrow" id="where"></p>
+      <article class="text rec-text"><p id="para"></p></article>
+      <p class="rec-script" id="script" hidden></p>
+      <div class="rec-actions">
+        <span class="muted small"
+          >Click a line you'd want explained. Space or → for the next
+          paragraph.</span
+        >
+        <button id="nextBtn" type="button">Next</button>
+      </div>
     </div>
-  </div>
 
-  <!-- 4. Ratings -->
-  <main class="card rec-wide" id="rate" hidden>
-    <h1>How hard was each paragraph?</h1>
-    <ol class="rec-ratings" id="ratings"></ol>
-    <button id="finishBtn" type="button" class="primary" disabled>Save the session</button>
-  </main>
+    <!-- 4. Ratings -->
+    <main class="card rec-wide" id="rate" hidden>
+      <h1>How hard was each paragraph?</h1>
+      <ol class="rec-ratings" id="ratings"></ol>
+      <button id="finishBtn" type="button" class="primary" disabled>
+        Save the session
+      </button>
+    </main>
 
-  <!-- 5. Saved -->
-  <main class="card" id="done" hidden>
-    <h1>Saved</h1>
-    <p class="lede" id="savedWhere"></p>
-    <ul class="tips" id="summary"></ul>
-    <p class="muted small"><a href="/record.html">Record another</a></p>
-  </main>
+    <!-- 5. Saved -->
+    <main class="card" id="done" hidden>
+      <h1>Saved</h1>
+      <p class="lede" id="savedWhere"></p>
+      <ul class="tips" id="summary"></ul>
+      <p class="muted small"><a href="/record.html">Record another</a></p>
+    </main>
 
-  <script type="module" src="record.js"></script>
-</body>
+    <script type="module" src="record.js"></script>
+  </body>
 </html>

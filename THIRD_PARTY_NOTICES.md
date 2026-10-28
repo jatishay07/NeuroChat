@@ -5,12 +5,12 @@ bundles, the following work by others under their own licenses.
 
 ## Included in this repository
 
-| What | Where | License |
-|---|---|---|
+| What                                                                                                               | Where                                       | License                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | [WebEyeTrack](https://github.com/RedForestAI/WebEyeTrack) (Davalos et al.), patched build, and its BlazeGaze model | `portal/vendor/webeyetrack/`, `portal/web/` | MIT, see `portal/vendor/webeyetrack/LICENSE`; its bundled dependencies in `THIRD_PARTY_LICENSES.txt` there |
-| [MediaPipe](https://github.com/google-ai-edge/mediapipe) Tasks Vision wasm 0.10.18 and the face landmarker model | `portal/vendor/mediapipe/` | Apache License 2.0, Copyright Google LLC, see `portal/vendor/mediapipe/LICENSE` |
-| [OpenMuse](https://github.com/DominiqueMakowski/OpenMuse) message parser | `companion/device/athena_decode.py` | MIT (below) |
-| OpenMuse public test recording (`tests/test_data/data_p1041.txt`, first lines) | `tests/fixtures/athena_p1041.txt` | MIT (below) |
+| [MediaPipe](https://github.com/google-ai-edge/mediapipe) Tasks Vision wasm 0.10.18 and the face landmarker model   | `portal/vendor/mediapipe/`                  | Apache License 2.0, Copyright Google LLC, see `portal/vendor/mediapipe/LICENSE`                            |
+| [OpenMuse](https://github.com/DominiqueMakowski/OpenMuse) message parser                                           | `companion/device/athena_decode.py`         | MIT (below)                                                                                                |
+| OpenMuse public test recording (`tests/test_data/data_p1041.txt`, first lines)                                     | `tests/fixtures/athena_p1041.txt`           | MIT (below)                                                                                                |
 
 ### OpenMuse
 
@@ -56,10 +56,10 @@ rather than redistributing them.
 
 ## Data that is downloaded, never committed
 
-| Dataset | Used by | Why it isn't in the repo |
-|---|---|---|
-| Bird et al. 2018, "mental state" Muse recordings ([jordan-bird/eeg-feature-generation](https://github.com/jordan-bird/eeg-feature-generation)) | `python -m companion.realdata` | The source repository has no license, so it can't be redistributed; it's fetched into `data/` (git-ignored). |
-| Afonso & Heinrichs 2025, Muse S eye-movement EEG (Zenodo 14860668) | Phase 1 of the reading-signals research | CC BY 4.0 and large; download it from Zenodo and cite the authors. |
+| Dataset                                                                                                                                        | Used by                                 | Why it isn't in the repo                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Bird et al. 2018, "mental state" Muse recordings ([jordan-bird/eeg-feature-generation](https://github.com/jordan-bird/eeg-feature-generation)) | `python -m companion.realdata`          | The source repository has no license, so it can't be redistributed; it's fetched into `data/` (git-ignored). |
+| Afonso & Heinrichs 2025, Muse S eye-movement EEG (Zenodo 14860668)                                                                             | Phase 1 of the reading-signals research | CC BY 4.0 and large; download it from Zenodo and cite the authors.                                           |
 
 Recordings of people (EEG, gaze) are biometric data. Never commit them; `data/`, `*.xdf`, `*.edf`
 and `*.bdf` are git-ignored and the public-safety check rejects them.

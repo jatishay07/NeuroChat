@@ -1,17 +1,19 @@
 """Per-sensor signal quality from the last couple of seconds of EEG.
 
-The Athena gives no impedance reading, so quality is judged from the signal itself,
-after a 1–30 Hz bandpass removes the DC offset and slow drift: a sensor that is
-flat has lost contact, and one swinging more than ~100 µV is picking up movement,
-blinks or a loose fit.
+The Athena gives no impedance reading, so quality is judged from the signal
+itself, after a 1–30 Hz bandpass removes the DC offset and slow drift: a sensor
+that is flat has lost contact, and one swinging more than ~100 µV is picking up
+movement, blinks or a loose fit.
 """
+
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import butter, sosfiltfilt
+from scipy.signal import butter
+from scipy.signal import sosfiltfilt
 
-FLAT_STD_UV = 1.0       # below this the sensor is not touching skin
-NOISY_PTP_UV = 100.0    # above this the signal is mostly artifact
+FLAT_STD_UV = 1.0  # below this the sensor is not touching skin
+NOISY_PTP_UV = 100.0  # above this the signal is mostly artifact
 MIN_SECONDS = 1.0
 
 
@@ -27,7 +29,7 @@ def channel_quality(window: np.ndarray, srate: float) -> list[str]:
     sos = butter(4, [1.0, 30.0], btype="bandpass", fs=srate, output="sos")
     filtered = sosfiltfilt(sos, window, axis=1)
     labels = []
-    for raw, ch in zip(window, filtered):
+    for raw, ch in zip(window, filtered, strict=False):
         if raw.std() < FLAT_STD_UV:
             labels.append("flat")
         elif np.ptp(ch) > NOISY_PTP_UV:

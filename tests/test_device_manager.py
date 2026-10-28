@@ -3,8 +3,10 @@ import asyncio
 import numpy as np
 import pytest
 
-from companion.device import BackendError, DeviceManager, SimulatedBackend
+from companion.device import BackendError
+from companion.device import DeviceManager
 from companion.device import manager as manager_mod
+from companion.device import SimulatedBackend
 
 
 def run(coro):
@@ -32,6 +34,7 @@ def test_scan_connect_stream_and_disconnect():
         assert m.window(1.0).shape == (4, 256)
         await m.disconnect()
         assert m.state == "idle" and m.device is None
+
     run(go())
 
 
@@ -43,6 +46,7 @@ def test_flat_sensor_is_reported():
         await wait_for(lambda: "unknown" not in m.quality)
         assert m.quality == ["good", "good", "flat", "good"]
         await m.disconnect()
+
     run(go())
 
 
@@ -52,11 +56,13 @@ def test_connect_to_unknown_address_sets_error():
         with pytest.raises(BackendError):
             await m.connect("NOPE")
         assert m.state == "error" and "NOPE" in m.error
+
     run(go())
 
 
 class DyingBackend(SimulatedBackend):
     """Streams briefly, then goes silent, like a headset walking out of range."""
+
     def read(self):
         data = super().read()
         if self._sent > 64:
@@ -66,12 +72,14 @@ class DyingBackend(SimulatedBackend):
 
 def test_lost_signal_is_detected(monkeypatch):
     monkeypatch.setattr(manager_mod, "STALL_SECONDS", 0.5)
+
     async def go():
         m = DeviceManager(DyingBackend())
         await m.scan(timeout=0.1)
         await m.connect("SIM-0001")
         await wait_for(lambda: m.state == "error")
         assert "Lost the headset signal" in m.error
+
     run(go())
 
 
@@ -85,12 +93,14 @@ def test_subscribers_get_status_updates():
         while not q.empty():
             states.append((await q.get())["state"])
         assert states[:2] == ["scanning", "idle"]
+
     run(go())
 
 
 def test_eeg_between_returns_samples_from_a_time_span():
     async def go():
         import time
+
         m = DeviceManager(SimulatedBackend())
         await m.scan(timeout=0.1)
         await m.connect("SIM-0001")
@@ -99,7 +109,10 @@ def test_eeg_between_returns_samples_from_a_time_span():
         await asyncio.sleep(1.0)
         t1 = time.monotonic()
         span = m.eeg_between(t0, t1)
-        assert span.shape[0] == 4 and 128 < span.shape[1] < 384  # about 1 s at 256 Hz
+        assert (
+            span.shape[0] == 4 and 128 < span.shape[1] < 384
+        )  # about 1 s at 256 Hz
         assert m.eeg_between(t1 + 10, t1 + 20).shape[1] == 0
         await m.disconnect()
+
     run(go())

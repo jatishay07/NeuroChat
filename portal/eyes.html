@@ -1,127 +1,216 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NeuroChat · Eye tracking</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="tutor.css">
-  <link rel="stylesheet" href="gaze.css">
-  <link rel="stylesheet" href="reader.css">
-</head>
-<body class="eyes">
-  <header class="top">
-    <span class="brand">NeuroChat</span>
-    <span class="steps" role="img" aria-label="Step 2 of 3"><i class="on"></i><i class="on"></i><i></i></span>
-  </header>
-  <!-- 1. Start the camera -->
-  <main class="card" id="intro">
-    <h1>Calibrate eye tracking</h1>
-    <p class="lede">Your webcam works out where on the screen you're looking. Nothing is recorded or sent anywhere: the video stays in this browser tab.</p>
-    <ul class="tips">
-      <li>Sit about an arm's length from the screen, face lit from the front.</li>
-      <li>Keep your head fairly still; move your eyes, not your head.</li>
-      <li>Glasses are fine. Avoid a bright window behind you.</li>
-    </ul>
-    <button id="startBtn" type="button" class="primary">Start camera</button>
-    <p class="muted small"><a href="/">Back to the headset</a></p>
-    <p id="message" class="message" role="status"></p>
-  </main>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroChat · Eye tracking</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="tutor.css" />
+    <link rel="stylesheet" href="gaze.css" />
+    <link rel="stylesheet" href="reader.css" />
+  </head>
+  <body class="eyes">
+    <header class="top">
+      <span class="brand">NeuroChat</span>
+      <span class="steps" role="img" aria-label="Step 2 of 3"
+        ><i class="on"></i><i class="on"></i><i></i
+      ></span>
+    </header>
+    <!-- 1. Start the camera -->
+    <main class="card" id="intro">
+      <h1>Calibrate eye tracking</h1>
+      <p class="lede">
+        Your webcam works out where on the screen you're looking. Nothing is
+        recorded or sent anywhere: the video stays in this browser tab.
+      </p>
+      <ul class="tips">
+        <li>
+          Sit about an arm's length from the screen, face lit from the front.
+        </li>
+        <li>Keep your head fairly still; move your eyes, not your head.</li>
+        <li>Glasses are fine. Avoid a bright window behind you.</li>
+      </ul>
+      <button id="startBtn" type="button" class="primary">Start camera</button>
+      <p class="muted small"><a href="/">Back to the headset</a></p>
+      <p id="message" class="message" role="status"></p>
+    </main>
 
-  <!-- 2. Calibration dots fill the screen -->
-  <div id="calib" class="calib" hidden>
-    <p class="calib-help" id="calibHelp">Look right at the dot, then click it.</p>
-    <div id="dots"></div>
-  </div>
+    <!-- 2. Calibration dots fill the screen -->
+    <div id="calib" class="calib" hidden>
+      <p class="calib-help" id="calibHelp">
+        Look right at the dot, then click it.
+      </p>
+      <div id="dots"></div>
+    </div>
 
-  <!-- 3. Read and see where your eyes spent their time -->
-  <div id="reader" class="reader" hidden>
-    <article class="text" id="text">
-      <p class="eyebrow">Step 3 of 3 · Reading test</p>
-      <h1>How do batteries store energy?</h1>
-      <p>A battery is a small chemical factory that runs in reverse when you charge it. Inside, two different materials sit on either side of a liquid or gel. When you connect a device, one side gives up electrons and the other side takes them, and that flow of electrons through your device is the electric current.</p>
-      <p>The side that gives up electrons is called the anode, and the side that accepts them is the cathode. In a typical phone battery the anode is made of graphite, the same material as pencil lead, and the cathode is a metal oxide containing lithium.</p>
-      <p>The electrochemical potential difference between electrodes arises from the disparity in Gibbs free energy of lithium in each host lattice; intercalation into graphite is thermodynamically favoured only when an external overpotential exceeds the open-circuit voltage, whereupon Li<sup>+</sup> migrates through the electrolyte while electrons traverse the external circuit, preserving charge neutrality.</p>
-      <p>When you plug your phone in, the charger pushes the electrons back the other way. Lithium ions travel back through the liquid to the graphite side and tuck themselves between its layers, ready to flow out again the next time you use the phone.</p>
-      <p>Batteries wear out because every trip back and forth slightly damages the materials. Tiny cracks form, and some lithium gets trapped where it can no longer move. That is why a two-year-old phone does not last as long on a charge as a new one.</p>
-    </article>
-    <!-- The tutor's offer and answer are moved under the paragraph they're about (reader-ui.js).
+    <!-- 3. Read and see where your eyes spent their time -->
+    <div id="reader" class="reader" hidden>
+      <article class="text" id="text">
+        <p class="eyebrow">Step 3 of 3 · Reading test</p>
+        <h1>How do batteries store energy?</h1>
+        <p>
+          A battery is a small chemical factory that runs in reverse when you
+          charge it. Inside, two different materials sit on either side of a
+          liquid or gel. When you connect a device, one side gives up electrons
+          and the other side takes them, and that flow of electrons through your
+          device is the electric current.
+        </p>
+        <p>
+          The side that gives up electrons is called the anode, and the side
+          that accepts them is the cathode. In a typical phone battery the anode
+          is made of graphite, the same material as pencil lead, and the cathode
+          is a metal oxide containing lithium.
+        </p>
+        <p>
+          The electrochemical potential difference between electrodes arises
+          from the disparity in Gibbs free energy of lithium in each host
+          lattice; intercalation into graphite is thermodynamically favoured
+          only when an external overpotential exceeds the open-circuit voltage,
+          whereupon Li<sup>+</sup> migrates through the electrolyte while
+          electrons traverse the external circuit, preserving charge neutrality.
+        </p>
+        <p>
+          When you plug your phone in, the charger pushes the electrons back the
+          other way. Lithium ions travel back through the liquid to the graphite
+          side and tuck themselves between its layers, ready to flow out again
+          the next time you use the phone.
+        </p>
+        <p>
+          Batteries wear out because every trip back and forth slightly damages
+          the materials. Tiny cracks form, and some lithium gets trapped where
+          it can no longer move. That is why a two-year-old phone does not last
+          as long on a charge as a new one.
+        </p>
+      </article>
+      <!-- The tutor's offer and answer are moved under the paragraph they're about (reader-ui.js).
          No <p> inside them: eyes.js treats every <p> in #text as a paragraph to track. -->
-    <div id="offer" class="offer" hidden>
-      <span id="offerText"></span>
-      <div class="row">
-        <button id="offerYes" type="button" class="primary">Explain it</button>
-        <button id="offerNo" type="button" class="quiet">Not now</button>
-      </div>
-    </div>
-    <section id="tutor" class="tutor" aria-live="polite" hidden>
-      <div class="tutor-head">
-        <span id="tutorStatus" class="muted small"></span>
-        <button id="doneBtn" type="button" class="quiet">Got it</button>
-      </div>
-      <div id="chat" class="chat"></div>
-      <div class="quick">
-        <button type="button" class="quiet" data-ask="Explain it again, more simply.">Simpler</button>
-        <button type="button" class="quiet" data-ask="Give me a concrete example.">Example</button>
-      </div>
-      <form id="askForm" class="ask" hidden>
-        <input id="askInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" aria-label="Ask the tutor a follow-up question">
-        <button id="askBtn" type="submit" class="primary" aria-label="Send">&#8593;</button>
-      </form>
-    </section>
-
-    <aside class="panel" id="insights" hidden>
-      <h2>Where your eyes went</h2>
-      <p class="muted small">Time spent on each paragraph, per 100 words. Paragraphs you were much slower on are marked, and the tutor offers to explain them. Click any row to ask about that paragraph.</p>
-      <ol id="bars" class="bars"></ol>
-      <p class="accuracy small" id="accuracy"></p>
-      <div class="row">
-        <button id="dotBtn" type="button" class="quiet">Hide gaze dot</button>
-        <button id="camBtn" type="button" class="quiet">Hide camera</button>
-        <button id="resetBtn" type="button" class="quiet">Reset times</button>
-      </div>
-    </aside>
-
-    <nav class="dock" aria-label="Reading tools">
-      <span class="stat" id="eyeStat"><i></i>Eyes</span>
-      <span class="stat" id="headStat"><i></i>Headset</span>
-      <span class="sep" aria-hidden="true"></span>
-      <button id="insightsBtn" type="button" class="quiet" aria-expanded="false" aria-controls="insights">Insights</button>
-      <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
-      <button id="finishBtn" type="button" class="quiet">Finish</button>
-    </nav>
-
-    <div id="recap" class="recap" role="dialog" aria-modal="true" aria-labelledby="recapTitle" hidden>
-      <section class="card">
-        <div class="recap-head">
-          <span class="muted small" id="recapSub"></span>
-          <h1 id="recapTitle"></h1>
+      <div id="offer" class="offer" hidden>
+        <span id="offerText"></span>
+        <div class="row">
+          <button id="offerYes" type="button" class="primary">
+            Explain it
+          </button>
+          <button id="offerNo" type="button" class="quiet">Not now</button>
         </div>
-        <ol id="recapBars" class="recap-bars" aria-label="Time on each paragraph"></ol>
-        <div id="recapNote" class="recap-note" hidden>
-          <i aria-hidden="true"></i>
-          <div><strong id="recapNoteTitle"></strong> <span id="recapNoteText" class="muted"></span></div>
-          <button id="recapExplain" type="button" class="quiet">Explain it</button>
+      </div>
+      <section id="tutor" class="tutor" aria-live="polite" hidden>
+        <div class="tutor-head">
+          <span id="tutorStatus" class="muted small"></span>
+          <button id="doneBtn" type="button" class="quiet">Got it</button>
         </div>
-        <button id="recapClose" type="button" class="primary">Keep reading</button>
+        <div id="chat" class="chat"></div>
+        <div class="quick">
+          <button
+            type="button"
+            class="quiet"
+            data-ask="Explain it again, more simply."
+          >
+            Simpler
+          </button>
+          <button
+            type="button"
+            class="quiet"
+            data-ask="Give me a concrete example."
+          >
+            Example
+          </button>
+        </div>
+        <form id="askForm" class="ask" hidden>
+          <input
+            id="askInput"
+            type="text"
+            placeholder="Ask a follow-up…"
+            autocomplete="off"
+            aria-label="Ask the tutor a follow-up question"
+          />
+          <button id="askBtn" type="submit" class="primary" aria-label="Send">
+            &#8593;
+          </button>
+        </form>
       </section>
+
+      <aside class="panel" id="insights" hidden>
+        <h2>Where your eyes went</h2>
+        <p class="muted small">
+          Time spent on each paragraph, per 100 words. Paragraphs you were much
+          slower on are marked, and the tutor offers to explain them. Click any
+          row to ask about that paragraph.
+        </p>
+        <ol id="bars" class="bars"></ol>
+        <p class="accuracy small" id="accuracy"></p>
+        <div class="row">
+          <button id="dotBtn" type="button" class="quiet">Hide gaze dot</button>
+          <button id="camBtn" type="button" class="quiet">Hide camera</button>
+          <button id="resetBtn" type="button" class="quiet">Reset times</button>
+        </div>
+      </aside>
+
+      <nav class="dock" aria-label="Reading tools">
+        <span class="stat" id="eyeStat"><i></i>Eyes</span>
+        <span class="stat" id="headStat"><i></i>Headset</span>
+        <span class="sep" aria-hidden="true"></span>
+        <button
+          id="insightsBtn"
+          type="button"
+          class="quiet"
+          aria-expanded="false"
+          aria-controls="insights"
+        >
+          Insights
+        </button>
+        <button id="recalBtn" type="button" class="quiet">Recalibrate</button>
+        <button id="finishBtn" type="button" class="quiet">Finish</button>
+      </nav>
+
+      <div
+        id="recap"
+        class="recap"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recapTitle"
+        hidden
+      >
+        <section class="card">
+          <div class="recap-head">
+            <span class="muted small" id="recapSub"></span>
+            <h1 id="recapTitle"></h1>
+          </div>
+          <ol
+            id="recapBars"
+            class="recap-bars"
+            aria-label="Time on each paragraph"
+          ></ol>
+          <div id="recapNote" class="recap-note" hidden>
+            <i aria-hidden="true"></i>
+            <div>
+              <strong id="recapNoteTitle"></strong>
+              <span id="recapNoteText" class="muted"></span>
+            </div>
+            <button id="recapExplain" type="button" class="quiet">
+              Explain it
+            </button>
+          </div>
+          <button id="recapClose" type="button" class="primary">
+            Keep reading
+          </button>
+        </section>
+      </div>
     </div>
-  </div>
 
-  <!-- Camera preview (the tracker reads frames from this video) and the gaze dot. -->
-  <div id="cam" class="cam" hidden>
-    <video id="camVideo" autoplay playsinline muted></video>
-    <span id="faceChip" class="chip">Starting…</span>
-  </div>
-  <div id="gazeDot" class="gaze-dot" hidden></div>
+    <!-- Camera preview (the tracker reads frames from this video) and the gaze dot. -->
+    <div id="cam" class="cam" hidden>
+      <video id="camVideo" autoplay playsinline muted></video>
+      <span id="faceChip" class="chip">Starting…</span>
+    </div>
+    <div id="gazeDot" class="gaze-dot" hidden></div>
 
-  <!-- WebEyeTrack (MIT), built from github.com/RedForestAI/WebEyeTrack; see vendor/webeyetrack/README.md. -->
-  <script src="vendor/webeyetrack/webeyetrack.js"></script>
-  <script src="paragraph-tracker.js"></script>
-  <script src="gaze-correction.js"></script>
-  <script src="eyes.js"></script>
-  <script src="tutor.js"></script>
-  <script src="reader-ui.js"></script>
-</body>
+    <!-- WebEyeTrack (MIT), built from github.com/RedForestAI/WebEyeTrack; see vendor/webeyetrack/README.md. -->
+    <script src="vendor/webeyetrack/webeyetrack.js"></script>
+    <script src="paragraph-tracker.js"></script>
+    <script src="gaze-correction.js"></script>
+    <script src="eyes.js"></script>
+    <script src="tutor.js"></script>
+    <script src="reader-ui.js"></script>
+  </body>
 </html>

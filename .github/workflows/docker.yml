@@ -6,7 +6,15 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths: [Dockerfile, docker/**, companion/**, portal/**, pyproject.toml, .github/workflows/docker.yml]
+    paths:
+      [
+        Dockerfile,
+        docker/**,
+        companion/**,
+        portal/**,
+        pyproject.toml,
+        .github/workflows/docker.yml,
+      ]
   workflow_dispatch:
 
 # A newer push to the same branch replaces a build still running, so main publishes its latest commit.

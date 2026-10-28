@@ -22,10 +22,56 @@ hardware = [
   "pylsl>=1.16",
   "OpenMuse @ https://github.com/DominiqueMakowski/OpenMuse/zipball/main",
 ]
-dev = ["pytest>=8", "httpx>=0.27"]
+# Tests, and the formatters and linters that scripts/lint.sh runs (pinned, so
+# everyone formats the same way).
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "ruff==0.16.9",
+  "shfmt-py==4.2.0",
+  "shellcheck-py==0.11.0.1",
+]
 
 [tool.setuptools]
 packages = ["companion", "companion.device"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Google Python Style Guide (https://google.github.io/styleguide/pyguide.html), as Ruff
+# rules. `scripts/format.sh` applies them, `scripts/lint.sh` checks. See docs/style.md.
+[tool.ruff]
+line-length = 80
+indent-width = 4
+target-version = "py311"
+# athena_decode.py is vendored from OpenMuse and re-copied from upstream as is.
+extend-exclude = ["portal/vendor", "portal/web", "companion/device/athena_decode.py"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "E", "W",  # pycodestyle
+  "F",       # pyflakes
+  "I",       # imports: one per line, sorted (Google's isort profile)
+  "D",       # docstrings: Google convention
+  "N",       # naming
+  "B",       # likely bugs
+  "UP",      # modern syntax for the supported Python
+]
+ignore = [
+  "D1",    # a missing docstring isn't an error; when there is one, it follows the convention
+  "E501",  # the formatter wraps code at 80; long comments and URLs are flagged in review
+  "D205", "D415",  # older summaries run onto a second line; keep new ones to one line
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-single-line = true
+force-sort-within-sections = true
+single-line-exclusions = ["typing", "collections.abc"]
+order-by-type = false
