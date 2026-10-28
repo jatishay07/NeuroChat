@@ -26,3 +26,10 @@ Owned by the `study-mode` thread; only it edits this file.
 - Tests: tests/study/extension.mjs (news page, tricky real-site shapes, empty page); demo video by tests/study/record-extension.mjs.
 - Open question for Atishay: focus mode only, passive, or both (decision card); building focus mode meanwhile.
 - 2026-10-28: #39 merged (0d7e416). Integrator asked about the two pace-engine copies: `test_extension_uses_the_same_pace_engine` fails on any byte difference, so they can't drift. Follow-up: the Explain handoff check in tests/study/extension.mjs raced the side panel deleting `pending` (seen on #40), so it now listens for the storage write instead of polling.
+
+## 2026-10-28: 13 features before the headset
+
+- Node: Reviewer → draft PR. `[Reviewer] 3 critique rounds → fixed each round → 79 passed, 1 skipped → draft PR, waiting on Atishay's picks`.
+- No READY until Atishay says which features to keep; unpicked ones get removed before merge.
+- Video: tests/study/record-features.mjs (stand-in tutor, simulator for headset signals).
+- Edits to side-chat and companion files flagged in its inbox.

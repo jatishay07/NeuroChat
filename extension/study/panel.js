@@ -124,8 +124,10 @@
     if (next.due) await chrome.storage.local.set({ [key]: next }); else await chrome.storage.local.remove(key);
     trim(REVIEW, KEEP_REVIEW);
     const days = next.due ? Math.round((next.due - Date.now()) / 86400000) : 0;
-    t.el.querySelector(".actions")?.append(Object.assign(document.createElement("span"), { className: "noted",
-      textContent: next.due ? `Asking again in ${days} day${days > 1 ? "s" : ""}` : "Learned: no more questions on this one" }));
+    const note = Object.assign(document.createElement("span"), { className: "noted",
+      textContent: next.due ? `Asking again in ${days} day${days > 1 ? "s" : ""}` : "Learned: no more questions on this one" });
+    t.el.querySelector(".actions")?.append(note);
+    note.scrollIntoView({ block: "nearest" });
   }
   const dueItems = () => [...review.values()].filter((v) => v.due && v.due <= Date.now()).sort((a, b) => a.due - b.due);
   function showDue() {

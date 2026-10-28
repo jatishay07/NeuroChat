@@ -7,8 +7,8 @@ thread in its "Used by" column. Source of truth is the code; this file says who 
 
 ### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, portal/study.js (study mode; sends `index`, `title`, `dwellMsPer100Words`, `medianMsPer100Words`, `rereads`; `load` to resume a paragraph's conversation)
 Client → server:
-- `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?}`
-- `{"type":"ask","text"}`
+- `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?,"earlier"?}` (`earlier`: ≤3 strings of ≤600 chars, look-back from study mode)
+- `{"type":"ask","text","task"?}`: `task:true` uses a bare instruction-following prompt (study features)
 - `{"type":"continue"}` (copy into Open WebUI)
 - `{"type":"load","messages":[{"role","content"}],"mode":"explain"|"chat","title"?}`
 Server → client: `{"type":"start"}`, `{"type":"token","text"}`…, `{"type":"done"}`,
@@ -52,6 +52,13 @@ summary (409 if not). Files: `data/sessions/<id>/` (or `$NEUROCHAT_DATA/sessions
   tutor.js, reader-ui.js. `detail` = `{index, text, dwellMsPer100Words?, rereads?}`.
 - `neurochat:slow` — owner: eye-tracking · used by: extension/content.js (side-chat).
   `detail` = `{index, text, dwellMsPer100Words, rereads, element}`.
+
+## Extension messages
+
+- `neurochat:signal` — owner: study-mode · used by: reading-signals (headset, later). Runtime message to the
+  tab, or a window CustomEvent (simulator switch only), `detail`/message =
+  `{kind: "reread"|"clench"|"blink", line?, para?, source?}`. Without a source, a runtime message counts as "muse".
+- Port `neurochat:oneshot` (study-bg.js) — owner: study-mode: `{prompt}` in, `/ws/chat` token/done/error out.
 
 ## Python
 

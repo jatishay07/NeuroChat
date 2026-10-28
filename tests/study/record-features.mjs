@@ -77,6 +77,7 @@ await say(`Expected pace: ¶3 is dense, so it's expected to take ${(s.expected[2
 await say("Before you read: the side chat lists the page's key terms, and the tutor has defined them.", 1500);
 await panel.locator("#terms summary").click();
 await say("Before you read: the side chat lists the page's key terms, and the tutor has defined them.", 3000);
+await panel.locator("#terms summary").click(); // folded away again, so the chat stays in view
 await say("Your usual pace is seeded for this video (4 s per 100 words). Now I read ¶1 slowly…", 1500);
 await until(async () => (await state()).slow[0], 12000);
 await say("…slower than expected for you: a quiet amber edge, and the key terms in it get a dotted underline (hover shows the meaning).", 4600);
