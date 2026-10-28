@@ -185,12 +185,30 @@ try {
   assert.match(await page.evaluate(() => document.querySelector("span.neurochat-term").title), /charged particles/);
   seen.terms = "listed, defined, and the underline shows the definition";
 
+  // Switching a feature off mid-session takes its traces with it: underlines go, ¶3 is the author's again.
+  await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.features": { simulator: false, terms: false, plainer: false } }));
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator("span.neurochat-term").count(), 0);
+  assert.equal(await page.evaluate(() => document.querySelectorAll("article p")[3].innerHTML), before);
+  await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.features": { simulator: false } }));
+  seen.switchOff = "terms and Plainer undone at once";
+
+  // 7. Self-tuning, the other way: a flag in view 10 s and left with nothing done raises the bar a step…
+  let r0 = (await state({ flagFor: 11000 })).ratio;
+  await page.keyboard.press("j"); await page.waitForTimeout(1800);
+  assert.equal((await state()).ratio, Math.round((r0 + 0.05) * 10000) / 10000);
+  seen.tuneUp = (await state()).ratio;
+
   // Read on to the end, so the session has enough for a review.
-  for (let k = 0; k < 4; k++) { await page.keyboard.press("j"); await page.waitForTimeout(1800); }
+  for (let k = 0; k < 3; k++) { await page.keyboard.press("j"); await page.waitForTimeout(1800); }
+  // …but Exit with a flag in view isn't the reader judging it.
+  r0 = (await state({ flagFor: 11000 })).ratio;
 
   // 10. Session review at Exit: a card with what was hard, and the session as a CSV.
   await page.keyboard.press("Escape");
   s = await state();
+  assert.equal(s.ratio, r0, "Exit doesn't judge a flag");
+  assert.equal(await page.evaluate(() => document.querySelectorAll("article p")[3].innerHTML), before, "¶3 exactly as it was");
   assert.equal(s.on, false);
   assert.match(s.card, /paragraphs?, \d+ words in \d+ min/);
   assert.equal(await page.locator(".neurochat-dim, .neurochat-current, .neurochat-plain, span.neurochat-term, html.neurochat-study").count(), 0, "Exit leaves the page as it was");
@@ -205,7 +223,7 @@ try {
   seen.review = `${csv.length - 1} rows`;
 
   // Switches: with everything off, it is plain study mode again.
-  const off = Object.fromEntries(["expected", "rereads", "signals", "simulator", "explainKey", "selection", "lookback", "labels", "tune", "plainer", "checkback", "review", "fatigue", "terms"].map((k) => [k, false]));
+  const off = Object.fromEntries(["expected", "rereads", "signals", "simulator", "explainKey", "selection", "lookback", "labels", "tune", "plainer", "checkback", "review", "export", "fatigue", "terms"].map((k) => [k, false]));
   await sw.evaluate((f) => chrome.storage.local.set({ "neurochat.study.features": f }), off);
   await tabMsg({ type: "neurochat:study" });
   s = await state();
@@ -215,6 +233,12 @@ try {
   await page.keyboard.press("e");
   await page.waitForTimeout(500);
   assert.equal((await handoffs()).length, sent, "e does nothing with the Explain key off");
+  await page.keyboard.press("p");
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator(".neurochat-plain").count(), 0, "p does nothing with Plainer off");
+  s = await state({ suggestBreak: true });
+  assert.equal(s.cue, "", "no break reminder with it off");
+  assert.equal(s.sim, false);
   await page.keyboard.press("Escape");
   assert.equal((await state()).card, null, "no review card with it off");
   seen.switches = "all off = plain study mode";

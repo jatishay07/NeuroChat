@@ -159,9 +159,13 @@
   }
   // The mark at the start of the tutor's reply; anything it can't read counts as "partly".
   function parseGrade(text) {
-    const m = /\b(right|correct|partly|partially|partial|wrong|incorrect|not quite)\b/i.exec(String(text).slice(0, 60));
-    if (!m) return "partly";
-    return { right: "right", correct: "right", wrong: "wrong", incorrect: "wrong" }[m[1].toLowerCase()] || "partly";
+    const head = String(text).replace(/[*_#>"“]/g, "").trim().slice(0, 60).toLowerCase();
+    const first = /^(?:grade|mark|verdict)?\s*:?\s*([a-z]+)/.exec(head)?.[1];
+    const word = { right: "right", correct: "right", yes: "right", partly: "partly", partially: "partly", partial: "partly", wrong: "wrong", incorrect: "wrong", no: "wrong" }[first];
+    if (word) return word;
+    if (/\b(not|isn't|isn’t|wasn't|aren't|n't)\s+(quite\s+)?(right|correct)\b/.test(head)) return /quite/.test(head) ? "partly" : "wrong";
+    const m = /\b(right|correct|partly|partially|wrong|incorrect)\b/.exec(head);
+    return m ? { right: "right", correct: "right", wrong: "wrong", incorrect: "wrong" }[m[1]] || "partly" : "partly";
   }
   // "term: definition" lines (with or without bold, bullets or numbers) for the terms asked about.
   function parseDefs(text, terms) {

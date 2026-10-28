@@ -191,7 +191,7 @@ async function pageText() {
 // has something to go on.
 async function ask(text, shownText = text, meta) {
   let content = text;
-  if (!conv.messages.length) {
+  if (!conv.messages.length && !meta?.study) { // study mode's questions carry their paragraph already
     const page = await pageText();
     if (page && page.text) {
       content = `I'm reading "${page.title}". Here is the page:\n\n"""${page.text.slice(0, PAGE_CHARS)}"""\n\n${text}`;

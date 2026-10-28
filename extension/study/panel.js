@@ -20,7 +20,7 @@
   chrome.storage.onChanged.addListener((c, area) => {
     if (area === "session" && Object.keys(c).some((k) => k.startsWith("terms:"))) showTerms();
     if (area !== "local") return;
-    if (c[FLAGS]) { flags = c[FLAGS].newValue || {}; showTerms(); }
+    if (c[FLAGS]) { flags = c[FLAGS].newValue || {}; showTerms(); if (!has("checkback")) stopChecking(); }
     for (const [k, { newValue }] of Object.entries(c)) if (k.startsWith(REVIEW)) newValue ? review.set(k, newValue) : review.delete(k);
     showDue();
   });
@@ -147,7 +147,7 @@
     if (shown !== id) { shown = id; $("terms").open = false; }
     $("termList").textContent = got.terms.join(", ");
     const defs = got.defs ? got.terms.filter((t) => got.defs[t]).map((t) => `**${t}**: ${got.defs[t]}`).join("\n\n") : "";
-    $("defs").innerHTML = defs ? renderMarkdown(defs) : "Defining…";
+    $("defs").innerHTML = defs ? renderMarkdown(defs) : got.defs ? "The tutor couldn't define them just now." : "Defining…";
   }
   // The panel follows tabs itself; catch up when the tab or its page changes.
   chrome.tabs.onActivated.addListener(() => setTimeout(() => { stopChecking(); showTerms(); }, 50));
