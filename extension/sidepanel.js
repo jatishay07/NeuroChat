@@ -216,12 +216,12 @@ async function explain(req) {
   if (req.medianMsPer100Words) msg.medianMsPer100Words = req.medianMsPer100Words;
   // Study mode's look-back: earlier paragraphs in the same section that also slowed the reader.
   const earlier = Array.isArray(req.earlier) ? req.earlier.slice(0, 3) : [];
-  if (earlier.length) msg.earlier = earlier.map((e) => e.text);
+  if (earlier.length) msg.earlier = earlier.map((e) => String(e.text).slice(0, 600)); // the companion keeps 600 too
   // What the companion builds from this; kept here so the conversation can be restored later.
   let content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
     (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "");
   if (earlier.length) {
-    content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${e.text}"""`).join("\n\n")}\n\n${content}` +
+    content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${String(e.text).slice(0, 600)}"""`).join("\n\n")}\n\n${content}` +
       "\n\nExplain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.";
   }
   send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) }, req.key ? { ...req, study: "explain" } : undefined);

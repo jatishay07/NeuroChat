@@ -7,8 +7,8 @@ thread in its "Used by" column. Source of truth is the code; this file says who 
 
 ### /ws/chat — owner: side-chat · used by: portal tutor.js, portal chat.html, extension, portal/study.js (study mode; sends `index`, `title`, `dwellMsPer100Words`, `medianMsPer100Words`, `rereads`; `load` to resume a paragraph's conversation)
 Client → server:
-- `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?,"earlier"?}` (`earlier`: ≤3 strings of ≤600 chars, look-back from study mode)
-- `{"type":"ask","text","task"?}`: `task:true` uses a bare instruction-following prompt (study features)
+- `{"type":"explain","paragraph","title"?,"context"?,"index"?,"dwellMsPer100Words"?,"medianMsPer100Words"?,"rereads"?,"append"?,"earlier"?}` (`earlier`: ≤3 strings of ≤600 chars, look-back from study mode; the study hand-off in session storage carries it as `[{index, text}]` and sidepanel.js maps it to strings)
+- `{"type":"ask","text","task"?}`: `task:true` uses a bare instruction-following prompt (study features). Task turns stay in history on purpose: the quick check's grading needs its question
 - `{"type":"continue"}` (copy into Open WebUI)
 - `{"type":"load","messages":[{"role","content"}],"mode":"explain"|"chat","title"?}`
 Server → client: `{"type":"start"}`, `{"type":"token","text"}`…, `{"type":"done"}`,
