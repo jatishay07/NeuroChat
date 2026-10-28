@@ -20,7 +20,7 @@ const seen = {};
 try {
   const sw = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
   // A usual pace of 3 s per 100 words, from 10 earlier paragraphs.
-  await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.samples.v1": JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ k: `seed${i}`, v: 3000 }))) }));
+  await sw.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`neurochat.study.s:seed${i}`, { v: 3000, t: i }]))));
   const page = await context.newPage();
   await page.goto(url);
   const study = () => sw.evaluate(async () => {
@@ -82,16 +82,17 @@ try {
   // Leaving a paragraph adds it to the shared baseline; Esc turns study mode off and cleans up.
   await page.keyboard.press("j");
   await page.waitForFunction(() => /^When you plug/.test(document.querySelector(".neurochat-current")?.textContent));
-  const stored = await sw.evaluate(async () => JSON.parse((await chrome.storage.local.get("neurochat.study.samples.v1"))["neurochat.study.samples.v1"]));
+  const readings = () => sw.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith("neurochat.study.s:")));
+  const stored = await readings();
   assert.ok(stored.length >= 11, `baseline grew: ${stored.length}`);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study, neurochat-study").count(), 0);
   seen.cleanup = "Esc removes every trace";
 
   // Turning it off and on again on the same page doesn't count a paragraph twice.
+  const before = (await readings()).length;
   await study(); await page.waitForTimeout(300); await study();
-  const again = await sw.evaluate(async () => JSON.parse((await chrome.storage.local.get("neurochat.study.samples.v1"))["neurochat.study.samples.v1"]));
-  assert.equal(new Set(again.map((x) => x.k)).size, again.length, "one reading per paragraph");
+  assert.equal((await readings()).length, before, "re-lighting a paragraph replaces its reading instead of adding one");
 
   // Real-site shapes (fixtures/tricky.html).
   await page.goto(new URL("tricky.html", url).href);

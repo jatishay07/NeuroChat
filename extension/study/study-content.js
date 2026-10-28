@@ -6,17 +6,26 @@
 (() => {
   const P = self.StudyPace;
   const LINE = 0.38;      // the reading line, as a share of the window's height from the top
-  const SAMPLES = "neurochat.study.samples.v1"; // [{k, v}]: one reading per paragraph, shared by every tab
+  const PREFIX = "neurochat.study.s:"; // one key per paragraph read ({v, t}), so tabs never overwrite each other
   const KEEP = 200;
 
   let on = false, paras = [], at = -1, raf = 0, ticker = 0, watcher = null, recollect = 0;
-  let samples = [];
+  const samples = new Map(); // paragraph key -> {v, t}
   const state = new WeakMap(); // element -> its clock, visits, slow, frozen pace (survives re-collecting)
 
-  // ---- the baseline: one reading per paragraph (keyed by page and text), merged across tabs ----
-  const parse = (v) => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a.filter((s) => s && s.k && s.v > 0) : []; } catch { return []; } };
-  const get = async () => parse((await chrome.storage.local.get(SAMPLES))[SAMPLES]);
-  chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c[SAMPLES]) samples = parse(c[SAMPLES].newValue); });
+  // ---- the baseline: one reading per paragraph (keyed by page and text), shared by every tab ----
+  const ok = (s) => s && s.v > 0;
+  async function load() {
+    samples.clear();
+    for (const [k, s] of Object.entries(await chrome.storage.local.get(null))) if (k.startsWith(PREFIX) && ok(s)) samples.set(k.slice(PREFIX.length), s);
+  }
+  chrome.storage.onChanged.addListener((c, area) => {
+    if (area !== "local") return;
+    for (const [k, { newValue }] of Object.entries(c)) {
+      if (!k.startsWith(PREFIX)) continue;
+      if (ok(newValue)) samples.set(k.slice(PREFIX.length), newValue); else samples.delete(k.slice(PREFIX.length));
+    }
+  });
   function keyOf(text) {
     let h = 5381;
     for (const ch of location.origin + location.pathname + "\n" + text) h = (h * 33 + ch.codePointAt(0)) >>> 0;
@@ -25,15 +34,17 @@
   async function record(p) {
     const v = value(p);
     if (!v) return;
-    const all = await get(); // re-read so another tab's readings aren't overwritten
-    const i = all.findIndex((s) => s.k === p.key);
-    if (i >= 0) all[i].v = v; else all.push({ k: p.key, v });
-    samples = all.slice(-KEEP);
-    chrome.storage.local.set({ [SAMPLES]: JSON.stringify(samples) }).catch(() => {});
+    samples.set(p.key, { v, t: Date.now() });
+    chrome.storage.local.set({ [PREFIX + p.key]: { v, t: Date.now() } }).catch(() => {});
+    if (samples.size > KEEP) { // the oldest readings go first
+      const old = [...samples].sort((a, b) => a[1].t - b[1].t).slice(0, samples.size - KEEP).map(([k]) => k);
+      old.forEach((k) => samples.delete(k));
+      chrome.storage.local.remove(old.map((k) => PREFIX + k)).catch(() => {});
+    }
   }
   // The usual pace without this paragraph, so it's never compared with itself.
   function stats(p) {
-    const v = samples.filter((s) => s.k !== p.key).map((s) => s.v);
+    const v = [...samples].filter(([k]) => k !== p.key).map(([, s]) => s.v);
     return { median: P.median(v), samples: v.length };
   }
 
@@ -59,10 +70,9 @@
       .map((el) => {
         const text = textOf(el);
         let p = state.get(el);
-        if (!p || p.text !== text) {
-          p = { el, text, key: keyOf(text), words: P.words(text), clock: new P.Clock(), visits: 0, slow: false };
-          state.set(el, p);
-        }
+        if (!p) state.set(el, p = { el, clock: new P.Clock(), visits: 0, slow: false });
+        // Text that updates live ("updated 5 s ago") keeps its clock; only what it says changes.
+        if (p.text !== text) Object.assign(p, { text, key: keyOf(text), words: P.words(text) });
         return p;
       })
       .filter((p) => p.words >= P.MIN_WORDS);
@@ -215,8 +225,10 @@
     if (!next) return;
     e.preventDefault();
     // scrollIntoView also scrolls a page whose text sits in its own scrolling panel.
+    const was = next.el.style.scrollMarginTop;
     next.el.style.scrollMarginTop = `${Math.round(innerHeight * LINE - 4)}px`;
     next.el.scrollIntoView({ block: "start", behavior: "smooth" });
+    next.el.style.scrollMarginTop = was; // the scroll target is fixed when it starts; leave the page as it was
   }
   // Infinite scroll and single-page apps change the article while you read: collect again.
   function refresh() {
@@ -229,18 +241,19 @@
     if (lit && !next.includes(lit)) { lit.clock.stop(); record(lit); }
     paras = next;
     at = lit ? paras.indexOf(lit) : -1;
-    follow();
+    focus(current()); // not follow(): the page changing by itself isn't the reader doing something
+    draw();
   }
   const onMutate = (records) => {
     if (records.every((r) => host.contains(r.target) || r.target === document.documentElement)) return;
-    clearTimeout(recollect);
-    recollect = setTimeout(refresh, 400);
+    // At most every 400 ms, even on a page that never stops changing.
+    if (!recollect) recollect = setTimeout(refresh, 400);
   };
 
   let style = null;
   async function start() {
     if (on) return;
-    samples = await get();
+    await load();
     paras = collect();
     if (!paras.length) { say("No paragraphs to study on this page"); return; }
     on = true;
@@ -272,6 +285,7 @@
     on = false;
     clearInterval(ticker);
     clearTimeout(recollect);
+    recollect = 0;
     watcher?.disconnect();
     removeEventListener("scroll", onScroll, { capture: true });
     removeEventListener("resize", onScroll);
@@ -293,5 +307,5 @@
   });
 
   // Read-only view for tests (tests/study/extension.mjs).
-  self.__neurochatStudy = { state: () => ({ on, at, paragraphs: paras.length, slow: paras.map((p) => p.slow), samples: samples.length }) };
+  self.__neurochatStudy = { state: () => ({ on, at, paragraphs: paras.length, slow: paras.map((p) => p.slow), samples: samples.size }) };
 })();

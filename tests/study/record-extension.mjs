@@ -21,7 +21,7 @@ const context = await chromium.launchPersistentContext("", {
 });
 const sw = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
 const id = new URL(sw.url()).host;
-await sw.evaluate(() => chrome.storage.local.set({ "neurochat.study.samples.v1": JSON.stringify(Array.from({ length: 12 }, (_, i) => ({ k: `seed${i}`, v: 6000 }))) }));
+await sw.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`neurochat.study.s:seed${i}`, { v: 6000, t: i }]))));
 // The real side panel would take space from this window; the recording shows the chat as a page instead.
 await sw.evaluate(() => { chrome.sidePanel.open = async () => {}; });
 
