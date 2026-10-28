@@ -106,7 +106,7 @@ def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_
         line = f"- Reading time: {dwell_ms_per_100_words / 1000:.0f} s per 100 words"
         if median_ms_per_100_words:
             ratio = dwell_ms_per_100_words / median_ms_per_100_words
-            line += f", {ratio:.1f}× their usual pace in this text"
+            line += f", {ratio:.1f}× their usual pace"
         seen.append(line + ".")
     went_back = max(rereads or 0, (visits or 1) - 1)
     if went_back:
