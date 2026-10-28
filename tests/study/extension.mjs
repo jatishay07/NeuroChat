@@ -64,14 +64,17 @@ try {
     const r = document.querySelector(".neurochat-current").getBoundingClientRect();
     return { x: Math.min(r.right + 40, innerWidth - 40), y: Math.max(r.top, 8) + 14 };
   });
+  // Catch the handoff as it is written: the side panel deletes "pending" as soon as it reads it.
+  await sw.evaluate(() => {
+    self.__pending = null;
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "session" && changes.pending?.newValue && !self.__pending) self.__pending = changes.pending.newValue;
+    });
+  });
   await page.mouse.click(box.x, box.y);
   const pending = await sw.evaluate(async () => {
-    for (let k = 0; k < 50; k++) {
-      const { pending } = await chrome.storage.session.get("pending");
-      if (pending) return pending;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    return null;
+    for (let k = 0; k < 50 && !self.__pending; k++) await new Promise((r) => setTimeout(r, 100));
+    return self.__pending;
   });
   assert.ok(pending, "Explain reached the side chat");
   assert.match(pending.text, /^The electrochemical potential difference/);
