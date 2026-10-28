@@ -64,8 +64,6 @@ function addUser(shown) {
   const el = document.createElement("div");
   el.className = "turn-user";
   if (shown.quote) el.append(Object.assign(document.createElement("div"), { className: "quote", textContent: shown.quote }));
-  // Study mode's look-back: the earlier paragraphs that went along with this one.
-  if (shown.also?.length) el.append(Object.assign(document.createElement("div"), { className: "also", textContent: `Also sent: ${shown.also.map((i) => `¶${i}`).join(", ")}` }));
   if (shown.text) el.append(Object.assign(document.createElement("div"), { className: "bubble", textContent: shown.text }));
   $("log").append(el);
   el.scrollIntoView({ block: "end" });
@@ -219,14 +217,16 @@ async function explain(req) {
     content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${String(e.text).slice(0, 600)}"""`).join("\n\n")}\n\n${content}` +
       "\n\nExplain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.";
   }
-  send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) });
+  send(msg, content, { quote: req.text, text: "Explain this" });
 }
 
 // Study mode saw the reader go back to a paragraph again after it was explained: put it another way.
 async function againFor(req) {
   if (busy) { queued.push(() => againFor(req)); return; }
   if (!conv || keyOf(req.url) !== conv.key) return; // the reader is on another page now
-  ask("I went back to that paragraph again and it still doesn't click. Explain it a different way: simpler, with one concrete example.", "Still stuck on it");
+  // The paragraph goes along: something else may have been explained since.
+  const text = `I went back to this paragraph again and it still doesn't click. Explain it a different way: simpler, with one concrete example.\n\n"""${req.text}"""`;
+  send({ type: "ask", text }, text, { quote: req.text, text: "Still stuck on it" });
 }
 
 const CHIPS = {

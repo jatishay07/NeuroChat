@@ -137,8 +137,8 @@ def explain_request(paragraph: str, title: str | None = None, context: str | Non
                     rereads: int | None = None, earlier: list[str] | None = None) -> str:
     """paragraph is what to explain: a paragraph, or a passage the reader selected. context is the
     paragraph around a selection, so a short selection ("Gibbs free energy") isn't explained blind.
-    rereads is how often eye tracking saw the reader go back to it. earlier is study mode's look-back:
-    paragraphs just before it, in the same section, that also slowed the reader down."""
+    rereads is how often the reader went back to it (eye tracking, study mode or a headset). earlier is
+    study mode's look-back: paragraphs just before it, in the same section, that also slowed the reader down."""
     where = f' in a text titled "{title}"' if title else ""
     if rereads and rereads > 0:
         where += f" (I went back and reread it {rereads} time{'s' if rereads > 1 else ''})"

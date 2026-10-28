@@ -155,7 +155,7 @@ def test_study_mode_explains_hands_free_in_the_extension():
     prompts = [c["messages"][-1]["content"] for c in standin.chats]
     # Look-back reached the tutor, and so did "explain it a different way".
     assert any(p.startswith("Earlier in the same section I also slowed down on:") for p in prompts)
-    assert any("still doesn't click" in p for p in prompts)
+    assert any("still doesn't click" in p and "A battery is a small chemical factory" in p for p in prompts)
 
 
 def test_look_back_paragraphs_reach_the_tutor():

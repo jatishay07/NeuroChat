@@ -11,7 +11,9 @@
   const PREFIX = "neurochat.study.s:"; // one key per paragraph read ({v, t, x, h}), so tabs never overwrite each other
   const FLAGS_KEY = "neurochat.study.features", RATIO_KEY = "neurochat.study.ratio";
   const KEEP = 200;
-  const REREAD_MS = 2000;  // back on a paragraph you'd left for this long = a reread, not an overshoot
+  const AWAY_MS = 3000;    // away from a paragraph at least this long (or 2+ paragraphs on) before coming back…
+  const REREAD_MS = 2000;  // …and back on it this long = a reread, not a scroll past and back
+  const AGAIN_MS = 20000;  // after an explanation, checking the paragraph against it isn't being stuck again
   const IGNORED_MS = 10000; // flagged, seen this long, then left without going back = a flag they didn't need
 
   // Developer switches only; there are no settings for the reader. The simulator sends headset signals
@@ -166,7 +168,9 @@
     p.el.classList.add("neurochat-current");
     if (!document.hidden) p.clock.start();
     // Back on a paragraph you'd already left, and staying there: a reread.
-    if (judge && p.last && from > i) rereadTimer = setTimeout(() => { if (paras[at] === p) signal({ kind: "reread", source: "scroll", para: i }); }, REREAD_MS);
+    if (judge && p.last && from > i && (Date.now() - p.last >= AWAY_MS || from - i >= 2)) {
+      rereadTimer = setTimeout(() => { if (paras[at] === p && !document.hidden) signal({ kind: "reread", source: "scroll", para: paras.indexOf(p) }); }, REREAD_MS);
+    }
     mark();
   }
 
@@ -187,7 +191,7 @@
   function stuck(p, trigger = "auto") {
     if (!has("auto") || (trigger === "auto" && !p.firstRead)) return;
     if (!p.explained) explain(p, trigger);
-    else if (!p.again && Date.now() - p.explainedAt > REREAD_MS) { p.again = true; again(p); }
+    else if (p.delivered && !p.again && Date.now() - p.explainedAt >= AGAIN_MS) { p.again = true; again(p); }
   }
 
   // ---- signals: one way in for every sign of trouble, from the page now and from a headset later ----
@@ -210,7 +214,10 @@
       if (Number.isInteger(s.line) && p.slow && i === at) underline(s.line);
       if (p.slow) stuck(p);
       mark();
-    } else if (s.kind === "clench") explain(p, "clench"); // a deliberate sign: explain now, slow or not
+    } else if (s.kind === "clench") { // a deliberate sign: explain now, slow or not; once explained, put it another way (once)
+      if (!p.explained) explain(p, "clench");
+      else if (p.delivered && !p.again) { p.again = true; again(p); }
+    }
     else if (s.kind === "stuck" && p.slow) stuck(p, "headset"); // the headset's own read, confirming the pace
   }
   // Developers (and tests) can send signals from the page only while the simulator is switched on,
@@ -245,7 +252,7 @@
     if (l) Object.assign(u.style, { left: `${scrollX + l.left}px`, top: `${scrollY + l.bottom}px`, width: `${l.right - l.left}px` });
   }
 
-  // ---- the dock, and the one pill a slow paragraph gets ----
+  // ---- the dock: Study mode, a line when something was explained, and Exit ----
   const host = document.createElement("neurochat-study");
   const root = host.attachShadow({ mode: "closed" });
   const FONT = `-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, sans-serif`;
@@ -253,9 +260,6 @@
     :host { all: initial; }
     button { all: initial; box-sizing: border-box; cursor: pointer; font: 500 13px/1.2 ${FONT}; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; white-space: nowrap; }
     button:focus-visible { outline: 2px solid #0b0d12; outline-offset: 2px; }
-    .pill { position: absolute; z-index: 2147483646; padding: 6px 12px; color: #fff; background: #0b0d12; border: 1px solid #0b0d12;
-      box-shadow: 0 6px 20px rgba(20, 30, 60, .14); }
-    .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e58a00; }
     [hidden] { display: none !important; }
     .line { position: absolute; z-index: 2147483645; height: 2px; margin-top: 1px; border-radius: 2px; background: rgba(229, 138, 0, .8); pointer-events: none; }
     .glass { position: fixed; z-index: 2147483646; left: 50%; bottom: 20px; transform: translateX(-50%); border-radius: 999px; font: 500 13px/1.2 ${FONT}; color: #4b5260;
@@ -267,7 +271,6 @@
     .dock i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #1f9d63; box-shadow: 0 0 0 3px rgba(31, 157, 99, .18); }
     .dock.slow i { background: #e58a00; box-shadow: 0 0 0 3px rgba(229, 138, 0, .2); }
     .dock b { font-weight: 500; color: #0b0d12; }
-    .dock .count { font: 500 12px ui-monospace, "SF Mono", Menlo, monospace; }
     .dock #cue { overflow: hidden; text-overflow: ellipsis; }
     .glass button { padding: 7px 12px; color: #0b0d12; }
     .glass button:hover { background: rgba(11, 13, 18, .06); }
@@ -275,31 +278,16 @@
     .sim span { font: 600 11px ${FONT}; color: #8a8f99; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px 2px; }
     @media (max-width: 480px) { .dock #cue { display: none; } }
   </style>
-  <button type="button" class="pill" id="pill" hidden>Explain</button>
   <div class="line" id="line" hidden></div>
-  <div class="glass dock" id="dock" role="status" hidden><i></i><b>Study mode</b><span class="count" id="count"></span><span id="cue"></span><button type="button" id="exit" aria-label="Turn off study mode">Exit</button></div>
+  <div class="glass dock" id="dock" role="status" hidden><i></i><b>Study mode</b><span id="cue"></span><button type="button" id="exit" aria-label="Turn off study mode">Exit</button></div>
   <div class="glass sim" id="sim" hidden><span>Headset simulator</span><button type="button" data-k="reread">Reread line 2</button><button type="button" data-k="stuck">Stuck</button><button type="button" data-k="clench">Jaw clench</button></div>`;
   const $ = (id) => root.getElementById(id);
 
   function draw() {
     const p = paras[at];
     $("dock").hidden = !on;
-    $("count").textContent = on ? `${at < 0 ? "–" : at + 1} / ${paras.length}` : "";
-    $("cue").textContent = !p ? "" : p.explained ? "Explained in the side chat" : p.slow ? "Slower than usual for you" : "";
+    $("cue").textContent = !p?.explained ? "" : p.delivered ? "Explained in the side chat" : "Explained: open the side chat to read it";
     $("dock").classList.toggle("slow", !!p?.slow);
-    // The pill only on a slow paragraph that hasn't been explained yet: a way in for a reader who
-    // doesn't want to wait for the second sign.
-    $("pill").hidden = !on || !p || !p.slow || !!p.explained;
-    if ($("pill").hidden) return;
-    $("pill").setAttribute("aria-label", `Explain paragraph ${at + 1} with NeuroChat`);
-    const r = p.el.getBoundingClientRect();
-    const w = $("pill").offsetWidth || 80, h = $("pill").offsetHeight || 30;
-    // Beside the paragraph's top-right corner; above it when the paragraph runs to the window's edge.
-    const beside = r.right + 12 + w <= innerWidth - 8;
-    const left = beside ? r.right + 12 : Math.min(r.right, innerWidth - 8) - w;
-    const top = beside ? Math.max(r.top, 8) : Math.max(r.top - h - 6, 8);
-    $("pill").style.left = `${scrollX + Math.max(8, left)}px`;
-    $("pill").style.top = `${scrollY + top}px`;
     if (lineAt !== null) underline(lineAt);
   }
 
@@ -308,7 +296,6 @@
     clearTimeout(note);
     document.documentElement.append(host);
     $("dock").hidden = false;
-    $("count").textContent = "";
     $("cue").textContent = text;
     note = setTimeout(() => { if (!on) host.remove(); }, 3000);
   }
@@ -323,7 +310,7 @@
       .map(({ q, k }) => ({ index: k + 1, text: q.text.slice(0, 600) }));
   }
 
-  function explain(p, trigger = "pill") {
+  function explain(p, trigger) {
     // Pace stops at Explain: reading the answer isn't reading the paragraph.
     if (p.frozen === undefined) { p.frozen = value(p); p.clock.stop(); }
     if (p.slow && !p.acted) tune("hit");
@@ -337,14 +324,15 @@
     if (p.rereads > 0) request.rereads = p.rereads;
     const before = earlier(p);
     if (before.length) request.earlier = before;
-    chrome.runtime.sendMessage({ type: "neurochat:explain", request }).catch(() => {});
+    // Delivered only if the side chat is open: Chrome won't open it without a click or key press, so a
+    // closed one picks the explanation up when the reader opens it (within a minute).
+    chrome.runtime.sendMessage({ type: "neurochat:explain", request }).then((r) => { p.delivered = !!r?.ok; }, () => {}).finally(draw);
     draw();
   }
   // Still going back after the explanation: the side chat asks for it a different way.
   function again(p) {
     chrome.runtime.sendMessage({ type: "neurochat:explain", request: { again: true, text: p.text.slice(0, 4000), title: document.title, url: location.href, key: p.key } }).catch(() => {});
   }
-  $("pill").addEventListener("click", () => { const p = paras[at]; if (p) explain(p); });
   $("exit").addEventListener("click", () => stop());
   root.getElementById("sim").addEventListener("click", (e) => {
     const k = e.target.closest("button")?.dataset.k;
@@ -362,7 +350,7 @@
   }
   const onScroll = () => { if (!raf) raf = requestAnimationFrame(follow); };
   const onActivity = () => paras[at]?.clock.poke();
-  const onVisibility = () => { const c = paras[at]?.clock; if (c) document.hidden ? c.stop() : c.start(); };
+  const onVisibility = () => { const c = paras[at]?.clock; if (c) document.hidden ? c.stop() : c.start(); if (document.hidden) clearTimeout(rereadTimer); };
   const onHide = () => { const p = paras[at]; if (p) { p.clock.stop(); record(p); if (!document.hidden) p.clock.start(); } };
   function onKey(e) {
     // The real target, even inside a web component's shadow DOM.
@@ -395,7 +383,7 @@
     focus(current(), false); // not follow(): the page changing by itself isn't the reader doing something
     draw();
   }
-  // Changes study mode makes itself (the pill, the dock) aren't the page changing.
+  // Changes study mode makes itself (the dock, the underline) aren't the page changing.
   const ours = (n) => host.contains(n) || n === document.documentElement;
   const onMutate = (records) => {
     if (records.every((r) => ours(r.target))) return;
@@ -418,7 +406,7 @@
     session = { start: Date.now(), signals: [] };
     // What a paragraph went through last session (on this page, without a reload) doesn't carry over.
     for (const p of paras) Object.assign(p, { clock: new P.Clock(), visits: 0, rereads: 0, slow: false, slowAt: 0, last: undefined,
-      firstRead: false, acted: false, judged: false, missed: false, explained: false, explainedAt: 0, again: false, frozen: undefined });
+      firstRead: false, acted: false, judged: false, missed: false, explained: false, delivered: false, explainedAt: 0, again: false, frozen: undefined });
     clearTimeout(note);
     style = document.createElement("style");
     style.textContent = `
@@ -472,10 +460,11 @@
     // For tests (tests/study/*.mjs) and only from the extension itself: read the state.
     if (msg.type === "neurochat:study-test") {
       if (msg.flagFor && paras[at]) Object.assign(paras[at], { slow: true, slowAt: Date.now() - msg.flagFor }); // a flag shown this many ms ago
+      if (msg.explainedAgo) for (const p of paras) if (p.explained) p.explainedAt = Date.now() - msg.explainedAgo; // the 20 s before "again"
       reply({ on, at, paragraphs: paras.length, slow: paras.map((p) => p.slow), rereads: paras.map((p) => p.rereads),
-        explained: paras.map((p) => !!p.explained), again: paras.map((p) => !!p.again), samples: samples.size, ratio,
+        explained: paras.map((p) => !!p.explained), delivered: paras.map((p) => !!p.delivered), again: paras.map((p) => !!p.again), samples: samples.size, ratio,
         expected: paras.map(expected), cue: $("cue").textContent, signals: session ? session.signals.map((s) => s.kind) : [],
-        underline: !$("line").hidden, pill: !$("pill").hidden, sim: !$("sim").hidden });
+        underline: !$("line").hidden, sim: !$("sim").hidden });
     }
   });
 })();

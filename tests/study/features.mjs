@@ -55,15 +55,14 @@ try {
   let s = await state();
   assert.ok(s.expected[2] > 1.8 * s.expected[0], `expected ${s.expected}`);
   assert.ok(s.sim, "the headset simulator shows when it's switched on");
-  assert.equal(s.pill, false, "nothing to press on a paragraph that isn't slow");
   seen.expected = { plain: s.expected[0], dense: s.expected[2] };
 
-  // Same 3.5 s on each: the plain ¶1 is slow for you, the dense ¶3 isn't. Slow alone explains nothing.
+  // Same 3.5 s on each: the plain ¶1 is slow for you, the dense ¶3 isn't. Slow alone explains nothing,
+  // and nothing is shown but the amber edge.
   await page.waitForTimeout(3500);
   s = await state();
   assert.equal(s.slow[0], true, "plain paragraph read slowly is flagged");
-  assert.equal(s.cue, "Slower than usual for you");
-  assert.equal(s.pill, true, "a slow paragraph gets the one pill");
+  assert.equal(s.cue, "");
   await page.keyboard.press("j"); await page.waitForTimeout(500);
   await page.keyboard.press("j"); await page.waitForTimeout(3500);
   s = await state();
@@ -72,17 +71,23 @@ try {
   assert.equal(s.ratio, 1.5, "leaving just after a flag doesn't count as a needless flag");
   assert.equal((await handoffs()).length, 0);
 
-  // Rereads: back to ¶2 and staying 2 s counts; a quick k-then-j doesn't. ¶2 isn't slow, so nothing is sent.
+  // Rereads: back to ¶2 after 3.5 s away, staying 2 s, counts. ¶2 wasn't slow on its first read, so nothing is sent.
   await page.keyboard.press("k"); await page.waitForTimeout(2600);
   s = await state();
   assert.equal(s.rereads[1], 1);
-  await page.keyboard.press("k"); await page.waitForTimeout(450); await page.keyboard.press("j"); await page.waitForTimeout(2600);
-  s = await state();
-  assert.equal(s.rereads[0], 0, "an overshoot isn't a reread");
   assert.equal((await handoffs()).length, 0, "a reread alone explains nothing");
+  // A scroll just past ¶1 and straight back isn't a reread, however long you then stay.
+  await page.keyboard.press("k"); await page.waitForTimeout(800);
+  await page.keyboard.press("j"); await page.waitForTimeout(600);
+  await page.keyboard.press("k"); await page.waitForTimeout(2600);
+  s = await state();
+  assert.equal(s.rereads[0], 0, "a scroll past and back isn't a reread");
+  assert.equal((await handoffs()).length, 0);
   seen.rereads = s.rereads;
 
-  // Slow and gone back to: explained in the side chat with nothing pressed.
+  // Slow on the first read and gone back to after a while away: explained in the side chat, nothing pressed.
+  await page.keyboard.press("j"); await page.waitForTimeout(3200);
+  const before = (await state()).ratio;
   await page.keyboard.press("k"); await page.waitForTimeout(2600);
   let h = await nextHandoff(0);
   assert.equal(h.trigger, "auto");
@@ -91,22 +96,30 @@ try {
   assert.ok(h.dwellMsPer100Words > h.medianMsPer100Words);
   s = await state();
   assert.equal(s.explained[0], true);
+  assert.equal(s.delivered[0], true);
   assert.equal(s.cue, "Explained in the side chat");
-  assert.equal(s.pill, false, "no pill once it's explained");
-  assert.ok(s.ratio < 1.5, `going back to a flag lowers the bar a little: ${s.ratio}`);
+  assert.ok(s.ratio < before, `going back to a flag lowers the bar a little: ${before} → ${s.ratio}`);
   await answered(1);
   seen.auto = "slow + reread → explained";
 
-  // Still going back after the explanation: once more, a different way. A third time, nothing more.
-  await page.keyboard.press("j"); await page.waitForTimeout(600);
+  // Going back to check it against the explanation straight away isn't being stuck again…
+  await page.keyboard.press("j"); await page.waitForTimeout(3200);
+  await page.keyboard.press("k"); await page.waitForTimeout(2600);
+  assert.equal((await state()).rereads[0], 2);
+  assert.equal((await handoffs()).length, 1, "checking the paragraph just after the explanation");
+  // …but still going back well after it is: once more, a different way. After that, nothing more.
+  await state({ explainedAgo: 25000 });
+  await page.keyboard.press("j"); await page.waitForTimeout(3200);
   await page.keyboard.press("k"); await page.waitForTimeout(2600);
   h = await nextHandoff(1);
   assert.equal(h.again, true);
   await panel.locator(".turn-user", { hasText: "Still stuck on it" }).waitFor({ timeout: 10000 });
   await panel.locator(".turn-tutor", { hasText: "two buckets" }).waitFor({ timeout: 10000 });
-  await page.keyboard.press("j"); await page.waitForTimeout(600);
+  await page.keyboard.press("j"); await page.waitForTimeout(3200);
   await page.keyboard.press("k"); await page.waitForTimeout(2600);
-  assert.equal((await handoffs()).length, 2, "explained differently once, not again and again");
+  await sendSignal({ kind: "clench" });
+  await page.waitForTimeout(400);
+  assert.equal((await handoffs()).length, 2, "explained differently once, not again and again (a clench neither)");
   seen.again = "a different way, once";
 
   // Headset (simulated): a reread on line 2 of a slow paragraph is underlined; a jaw clench explains now.
@@ -121,7 +134,6 @@ try {
   assert.equal(h.index, 3);
   // Look-back: explaining ¶3 also sends ¶1, which slowed you down earlier in the same section.
   assert.ok(h.earlier.map((e) => e.index).includes(1), JSON.stringify(h.earlier));
-  await panel.locator(".turn-user .also", { hasText: /Also sent: ¶1/ }).last().waitFor({ timeout: 10000 });
   seen.headset = "line underlined, clench explains, look-back sent ¶1";
 
   // The headset's own "stuck" confirms a slow paragraph without a reread.
