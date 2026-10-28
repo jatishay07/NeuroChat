@@ -32,6 +32,27 @@ def fake_ollama(models=("qwen3.5:4b",), reply=("Main idea: ", "batteries ", "mov
     return transport
 
 
+def fake_openai(models=("my-model",), reply=("Main idea: ", "batteries ", "move ions."), key=None):
+    """A stand-in for an OpenAI-compatible server at /v1 (LM Studio, vLLM, OpenAI...)."""
+    chats = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if key and request.headers.get("authorization") != f"Bearer {key}":
+            return httpx.Response(401, json={"error": "bad key"})
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": m} for m in models]})
+        if request.url.path == "/v1/chat/completions":
+            chats.append(json.loads(request.content))
+            lines = [f"data: {json.dumps({'choices': [{'delta': {'content': t}}]})}" for t in reply]
+            lines.append("data: [DONE]")
+            return httpx.Response(200, content="\n\n".join(lines).encode())
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    transport.chats = chats
+    return transport
+
+
 def chat_turn(ws, msg):
     ws.send_json(msg)
     events = []
@@ -220,3 +241,24 @@ def test_load_restores_a_conversation_and_explain_can_append():
     assert first["messages"][0]["content"].startswith("You are a patient tutor. The person is reading")
     assert "Intercalation" in first["messages"][3]["content"]
     assert [m["role"] for m in second["messages"]] == ["system", "user"]
+
+
+def test_openai_compatible_server():
+    server = fake_openai(key="sk-test")
+    tutor = Tutor(model="my-model", transport=server, openai_url="http://llm.local/v1", api_key="sk-test")
+    with TestClient(create_app(SimulatedBackend(), tutor)) as client:
+        assert client.get("/api/tutor").json()["ready"] is True
+        with client.websocket_connect("/ws/chat") as ws:
+            events = chat_turn(ws, {"type": "explain", "paragraph": "Intercalation into graphite..."})
+            assert "".join(e.get("text", "") for e in events) == "Main idea: batteries move ions."
+    (body,) = server.chats
+    assert body["model"] == "my-model" and body["stream"] is True
+    assert body["messages"][0]["role"] == "system" and "think" not in body
+
+
+def test_openai_compatible_server_problems_are_explained():
+    wrong_key = Tutor(model="my-model", transport=fake_openai(key="right"), openai_url="http://llm.local/v1", api_key="x")
+    missing = Tutor(model="other", transport=fake_openai(), openai_url="http://llm.local/v1")
+    for tutor, says in ((wrong_key, "API key"), (missing, "no model called other")):
+        s = TestClient(create_app(SimulatedBackend(), tutor)).get("/api/tutor").json()
+        assert s["ready"] is False and says in s["error"]

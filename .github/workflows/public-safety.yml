@@ -1,0 +1,44 @@
+# Keeps this public repository public-safe: no secrets (gitleaks, whole history), no biometric data,
+# no personal paths or emails (scripts/public_safety.py). Runs on every push and pull request, and
+# weekly so new gitleaks rules also re-check old history.
+name: Public safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks, every commit on every branch
+        run: |
+          docker run --rm -v "$PWD:/repo" --entrypoint sh ghcr.io/gitleaks/gitleaks:v8.21.2 -c \
+            'git config --global --add safe.directory /repo && gitleaks git /repo --config /repo/.gitleaks.toml --redact --verbose --log-opts="--all"'
+
+  private-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: No biometric data, personal paths or emails
+        env:
+          # Optional repository secret: words that must never appear (a real name, a computer's user name).
+          # Not available to pull requests from forks; those are checked again when merged.
+          PUBLIC_SAFETY_DENYLIST: ${{ secrets.PUBLIC_SAFETY_DENYLIST }}
+        run: python scripts/public_safety.py

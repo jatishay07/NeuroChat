@@ -14,15 +14,19 @@ concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
 
+# Pull requests (including ones from forks) only build and test; GitHub gives them a read-only token
+# and the push steps are skipped. Only pushes to main publish the image.
 permissions:
   contents: read
-  packages: write
 
 env:
   IMAGE: ghcr.io/jatishay07/neurochat
 
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -37,6 +41,8 @@ jobs:
           docker system prune -af >/dev/null
           df -h /
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: docker/setup-qemu-action@v3
         if: matrix.arch != 'amd64'
       - name: Build
@@ -66,16 +72,22 @@ jobs:
         run: docker logs nc 2>&1 | tail -100 || true
       - name: Push
         if: github.event_name != 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker push "$IMAGE:latest-${{ matrix.arch }}"
 
   publish:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - name: One tag for both architectures
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:latest-amd64" "$IMAGE:latest-arm64"

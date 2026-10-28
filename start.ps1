@@ -6,7 +6,9 @@
 #   --no-update     don't pull the latest version first
 #   --no-webui      don't start Open WebUI (the full chat portal on http://127.0.0.1:3000)
 # It also installs a `neurochat` command that runs this from any terminal.
-# NEUROCHAT_MODEL picks another Ollama model (default qwen3.5:4b, a 3.3 GB download).
+# NEUROCHAT_MODEL picks another model (default qwen3.5:4b in Ollama, a 3.3 GB download).
+# NEUROCHAT_LLM_URL uses an OpenAI-compatible server instead of Ollama (e.g. http://127.0.0.1:1234/v1
+# for LM Studio), with NEUROCHAT_LLM_API_KEY if it needs one; Ollama isn't installed then.
 # NEUROCHAT_WEBUI=docker|local|off picks how Open WebUI runs (default: Docker when it's running).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -121,7 +123,9 @@ function Setup-Model {
   if (-not (Test-Model $ollama)) { throw "Couldn't download $Model. If it says Ollama is too old, update it from https://ollama.com/download." }
   Write-Host "Local model ready: $Model"
 }
-if (-not $SkipModel) {
+if ($env:NEUROCHAT_LLM_URL) {
+  Write-Host "Using $Model from $($env:NEUROCHAT_LLM_URL) (NEUROCHAT_LLM_URL), so not setting up Ollama."
+} elseif (-not $SkipModel) {
   try { Setup-Model } catch { Write-Warning "$_ Carrying on without the local model; the headset screens still work." }
 }
 $env:NEUROCHAT_MODEL = $Model
@@ -161,6 +165,12 @@ if (-not $portFree) {
 # requests (follow-up suggestions, tags, autocomplete) keep a small model responsive.
 $WebUIVars = @{ WEBUI_AUTH = "False"; ENABLE_OPENAI_API = "False"; DEFAULT_MODELS = "neurochat-tutor";
   ENABLE_FOLLOW_UP_GENERATION = "False"; ENABLE_TAGS_GENERATION = "False"; ENABLE_AUTOCOMPLETE_GENERATION = "False" }
+# Your own OpenAI-compatible server shows up in Open WebUI too (from Docker, use host.docker.internal).
+if ($env:NEUROCHAT_LLM_URL) {
+  $WebUIVars.ENABLE_OPENAI_API = "True"
+  $WebUIVars.OPENAI_API_BASE_URL = $env:NEUROCHAT_LLM_URL
+  $WebUIVars.OPENAI_API_KEY = if ($env:NEUROCHAT_LLM_API_KEY) { $env:NEUROCHAT_LLM_API_KEY } else { "none" }
+}
 $WebUIProc = $null
 $WebUIContainer = $null
 function Test-Docker {

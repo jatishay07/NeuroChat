@@ -14,7 +14,11 @@ Everything runs on your own computer:
 | Chat portal: [Open WebUI](https://openwebui.com), for carrying on conversations | started by `neurochat` | Done |
 | Side chat: Chrome extension that explains what you select on any page | `extension/` | Explain-on-select, right-click, shortcut; [install](extension/README.md) |
 
-Build plan: [Struggle-Aware Tutor Build Plan](https://claude.ai/artifact/B7heEKCnARoA9t1QNRfA4D).
+No headset? Everything except the EEG works without one, and `--simulate` fakes it. The tutor runs on
+**any model you like**: Qwen3.5 4B in Ollama by default, or your own (see [Use your own model](#use-your-own-model)).
+
+> Research software, not a medical device. Nothing leaves your computer unless you point it at a
+> remote model server yourself.
 
 ## Run it
 
@@ -59,7 +63,7 @@ http://127.0.0.1:8765 opens in your browser and only works while the companion i
 - `--simulate` uses a fake headset; `--skip-model` skips Ollama and the model; `--no-update` skips the update;
   `--no-webui` skips Open WebUI. `NEUROCHAT_WEBUI=docker` or `NEUROCHAT_WEBUI=local` picks how Open WebUI runs.
 - `NEUROCHAT_MODEL=qwen3.5:2b-q4_K_M` picks a smaller model (1.9 GB) for older machines;
-  `qwen3.5:9b` (6.6 GB) gives better answers on 16 GB machines.
+  `qwen3.5:9b` (6.6 GB) gives better answers on 16 GB machines. Any other model works too: see below.
 
 <details>
 <summary>Manual setup instead</summary>
@@ -81,10 +85,45 @@ longer than the rest, the tutor offers to explain it with the local model (strea
 `/ws/chat`), and you can ask follow-up questions. **Continue in Open WebUI** copies the conversation into
 Open WebUI to keep going there, with its chat history, search and model picker.
 
+### Use your own model
+
+The tutor works with any chat model. Two environment variables pick it:
+
+| Variable | Default | What |
+|---|---|---|
+| `NEUROCHAT_MODEL` | `qwen3.5:4b` | The model's name, as your model server knows it |
+| `NEUROCHAT_LLM_URL` | (empty: Ollama) | An [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) server's base URL, ending in `/v1` |
+| `NEUROCHAT_LLM_API_KEY` | (none) | Its API key, if it needs one |
+
+**Any Ollama model** ([library](https://ollama.com/library)): `neurochat` downloads it on first run.
+
+```bash
+NEUROCHAT_MODEL=llama3.2:3b neurochat
+NEUROCHAT_MODEL=gemma3:12b neurochat
+```
+
+**Any OpenAI-compatible server**: LM Studio, llama.cpp's `llama-server`, vLLM, Jan, LocalAI, or a hosted
+API such as OpenAI or OpenRouter. Ollama isn't installed or started then.
+
+```bash
+# LM Studio (start its local server first)
+NEUROCHAT_LLM_URL=http://127.0.0.1:1234/v1 NEUROCHAT_MODEL=qwen2.5-7b-instruct neurochat
+# llama.cpp
+NEUROCHAT_LLM_URL=http://127.0.0.1:8080/v1 NEUROCHAT_MODEL=local neurochat
+# A hosted API (your text is then sent to that provider)
+NEUROCHAT_LLM_URL=https://api.openai.com/v1 NEUROCHAT_MODEL=gpt-4o-mini NEUROCHAT_LLM_API_KEY=sk-... neurochat
+```
+
+On Windows PowerShell, set them first: `$env:NEUROCHAT_MODEL = "llama3.2:3b"; .\start.cmd`.
+The tutor's status line on the portal says if the server can't be reached, refuses the key, or doesn't
+have that model. Open WebUI is set up with the same server the first time it starts, so **Continue in Open WebUI**
+uses it too; to switch servers later, change it in Open WebUI under Admin Settings → Connections.
+Small models do best with the tutor's short prompts; anything 3B and up works, 7B+ explains better.
+
 ### Open WebUI
 
 Open WebUI runs with sign-in turned off, because it only listens on this computer and is for one person.
-The companion keeps a **NeuroChat Tutor** model in it (Qwen3.5 in Ollama plus the tutor's instructions).
+The companion keeps a **NeuroChat Tutor** model in it (your model, Qwen3.5 by default, plus the tutor's instructions).
 It stops when you stop `neurochat`, and your chats are kept for next time (in the `neurochat-webui` Docker
 volume, or in `.webui-data`). Already run your own Open WebUI on port 3000? NeuroChat uses that one instead,
 as long as sign-in is off there; otherwise point it elsewhere with `NEUROCHAT_WEBUI_URL`.
@@ -127,6 +166,11 @@ From a clone, `docker compose up` does the same (`docker compose up --build` bui
   or run `./start.sh` once), the container uses that one instead and answers come at full speed; the
   logs say which it picked. `-e NEUROCHAT_OLLAMA=bundled` or `=host` forces one. With an NVIDIA GPU on
   Linux or Windows, add `--gpus all` to use the one inside.
+- **Your own model.** `-e NEUROCHAT_MODEL=llama3.2:3b` uses another Ollama model (downloaded on first
+  start; add `-v neurochat-models:/root/.ollama` to keep it). For an OpenAI-compatible server add
+  `-e NEUROCHAT_LLM_URL=... -e NEUROCHAT_MODEL=...` (and `-e NEUROCHAT_LLM_API_KEY=...`); a server on
+  your own computer is `http://host.docker.internal:<port>/v1` from inside the container
+  (on Linux also add `--add-host host.docker.internal:host-gateway`).
 - Both ports listen on this computer only. The image is rebuilt and published from `main` by
   `.github/workflows/docker.yml`; `docker build --build-arg MODEL=qwen3.5:2b-q4_K_M .` bakes in another model.
 
@@ -179,4 +223,26 @@ pytest
 
 ## Data
 
-Recordings are biometric data. `data/` and `*.xdf` are ignored by git; never commit them.
+Recordings are biometric data. `data/`, `*.xdf`, `*.edf` and `*.bdf` are ignored by git, and CI rejects
+them; never commit them. Public datasets are downloaded by scripts, not committed (see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+
+## Privacy and security
+
+The companion and Open WebUI listen on 127.0.0.1 only, the webcam video stays in the browser, and the
+companion refuses requests from other websites. Details, and how to report a problem privately, are in
+[SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+NeuroChat is under the [MIT License](LICENSE). It includes WebEyeTrack (MIT), MediaPipe (Apache 2.0) and
+OpenMuse's parser (MIT), and the Docker image bundles Open WebUI, Ollama and the Qwen3.5 model under their
+own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Based on *NeuroChat: A Neuroadaptive AI Chatbot for Customizing Learning Experiences*
+([arXiv 2503.07599](https://arxiv.org/abs/2503.07599)). The eye tracker is
+[WebEyeTrack](https://arxiv.org/abs/2508.19544) by Davalos et al.

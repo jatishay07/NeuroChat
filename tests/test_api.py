@@ -1,5 +1,6 @@
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 
 from companion.app import create_app
@@ -47,3 +48,20 @@ def test_streaming_status_carries_a_live_waveform():
                 wave = ws.receive_json()["wave"]
         assert len(wave) == 4 and all(len(ch) == 60 for ch in wave)
         assert all(abs(sum(ch) / 60) < 1 for ch in wave)  # centred on 0
+
+
+def test_other_websites_and_host_names_are_refused():
+    from starlette.websockets import WebSocketDisconnect
+
+    client = TestClient(create_app(SimulatedBackend()))
+    assert client.get("/api/device", headers={"Origin": "http://127.0.0.1:3000"}).status_code == 200
+    assert client.get("/api/device", headers={"Origin": "chrome-extension://abc"}).status_code == 200
+    assert client.get("/api/device", headers={"Origin": "https://evil.example"}).status_code == 403
+    assert client.post("/api/device/disconnect", headers={"Origin": "https://evil.example"}).status_code == 403
+    # DNS rebinding: a page on evil.example resolving to 127.0.0.1 sends its own Host.
+    assert client.get("/api/device", headers={"Host": "evil.example:8765"}).status_code == 403
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/chat", headers={"Origin": "https://evil.example"}) as ws:
+            ws.receive_json()
+    with client.websocket_connect("/ws/device", headers={"Origin": "http://localhost:8765"}) as ws:
+        assert ws.receive_json()
