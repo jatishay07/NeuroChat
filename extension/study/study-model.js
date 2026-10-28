@@ -161,10 +161,12 @@
   function parseGrade(text) {
     const head = String(text).replace(/[*_#>"“]/g, "").trim().slice(0, 60).toLowerCase();
     const first = /^(?:grade|mark|verdict)?\s*:?\s*([a-z]+)/.exec(head)?.[1];
-    const word = { right: "right", correct: "right", yes: "right", partly: "partly", partially: "partly", partial: "partly", wrong: "wrong", incorrect: "wrong", no: "wrong" }[first];
+    const word = { right: "right", correct: "right", yes: "right", partly: "partly", partially: "partly", partial: "partly", almost: "partly",
+      close: "partly", mostly: "partly", wrong: "wrong", incorrect: "wrong", no: "wrong", nope: "wrong" }[first];
     if (word) return word;
-    if (/\b(not|isn't|isn’t|wasn't|aren't|n't)\s+(quite\s+)?(right|correct)\b/.test(head)) return /quite/.test(head) ? "partly" : "wrong";
-    const m = /\b(right|correct|partly|partially|wrong|incorrect)\b/.exec(head);
+    const clause = head.split(/[.:;!—–]/)[0]; // "That's right that it rises, but…" shouldn't read as right past the first clause
+    if (first === "not" || /\b(not|isn't|isn’t|wasn't|aren't|n't)\s+(quite\s+)?(right|correct)\b/.test(clause)) return /\bquite\b/.test(clause) ? "partly" : "wrong";
+    const m = /\b(right|correct|partly|partially|wrong|incorrect)\b/.exec(clause);
     return m ? { right: "right", correct: "right", wrong: "wrong", incorrect: "wrong" }[m[1]] || "partly" : "partly";
   }
   // "term: definition" lines (with or without bold, bullets or numbers) for the terms asked about.

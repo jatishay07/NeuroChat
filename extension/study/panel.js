@@ -82,7 +82,7 @@
         bar.append(got, lost);
       }
     }
-    if (m.study === "check-q") startChecking(m, bar);
+    if (m.study === "check-q" && has("checkback")) startChecking(m, bar);
     if (m.study === "check-a") graded(t, m);
   });
 
@@ -91,10 +91,10 @@
   function startChecking(m, bar) {
     checking = { m, key: conv.key };
     input.placeholder = "Your answer, in your own words";
-    bar?.append(button("Skip", () => { stopChecking(); bar.querySelector(".study")?.remove(); }));
+    bar?.append(Object.assign(button("Skip", stopChecking), { className: "study skip" }));
     input.focus();
   }
-  function stopChecking() { checking = null; input.placeholder = placeholder; }
+  function stopChecking() { checking = null; input.placeholder = placeholder; document.querySelector(".study.skip")?.remove(); }
   async function check(req) {
     if (!has("checkback")) return;
     if (busy) { queued.push(() => check(req)); return; }

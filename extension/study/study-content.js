@@ -176,8 +176,8 @@
     p.el.classList.add("neurochat-current");
     if (!document.hidden && !p.plain) p.clock.start();
     // Back on a paragraph you'd already left, and staying there: a reread.
-    if (has("rereads") && p.last && from > i) rereadTimer = setTimeout(() => { if (paras[at] === p) signal({ kind: "reread", source: "scroll", para: i }); }, REREAD_MS);
-    if (from >= 0 && from < i) offerCheck(i, paras[from]);
+    if (judge && has("rereads") && p.last && from > i) rereadTimer = setTimeout(() => { if (paras[at] === p) signal({ kind: "reread", source: "scroll", para: i }); }, REREAD_MS);
+    if (judge && from >= 0 && from < i) offerCheck(i, paras[from]);
     mark();
   }
 
@@ -456,19 +456,22 @@
   function define(terms) {
     const note = (extra) => chrome.runtime.sendMessage({ type: "neurochat:terms", terms, url: location.href, title: document.title, ...extra }).catch(() => {});
     note({});
-    let text = "";
+    let text = "", over = false;
     const port = oneshot();
+    port.onDisconnect.addListener(() => { if (!over) note({ defs: {} }); }); // the worker went away mid-answer
     port.onMessage.addListener((m) => {
       if (m.type === "token") { text += m.text; return; }
+      over = true;
       port.close();
       if (m.type !== "done") { note({ defs: {} }); return; } // the side chat stops saying "Defining…"
       defs = M.parseDefs(text, terms);
-      for (const s of document.querySelectorAll("span.neurochat-term")) s.title = defs[s.textContent.toLowerCase()] || s.title;
+      for (const s of document.querySelectorAll("span.neurochat-term")) s.title = def(s.textContent) || s.title;
       note({ defs });
     });
     port.postMessage({ prompt: `I'm about to read "${document.title}". Define each of these terms in one plain sentence, as the text probably ` +
       `uses it. One line each, as: term: definition\n\nTerms: ${terms.join(", ")}` });
   }
+  const def = (w) => { w = w.toLowerCase(); return defs[w] || defs[w.replace(/s$/, "")] || defs[w.replace(/es$/, "")]; }; // plurals too
   function terms(p) {
     if (!has("terms") || !keyTerms.length || p.plain || p.termed) return;
     p.termed = true;
@@ -485,7 +488,7 @@
         const s = document.createElement("span");
         s.className = "neurochat-term";
         s.textContent = m;
-        s.title = defs[m.toLowerCase()] || "A key term on this page: see Before you read in the side chat";
+        s.title = def(m) || "A key term on this page: see Before you read in the side chat";
         frag.append(s);
         last = i + m.length;
       });
@@ -647,7 +650,7 @@
     session = { start: Date.now(), signals: [], blinks: [], extraMs: 0 };
     // What a paragraph went through last session (on this page, without a reload) doesn't carry over.
     for (const p of paras) Object.assign(p, { clock: new P.Clock(), visits: 0, rereads: 0, slow: false, slowAt: 0, first: undefined, last: undefined,
-      acted: false, judged: false, explained: false, checked: false, frozen: undefined, termed: false });
+      acted: false, judged: false, explained: false, checked: false, dismissed: false, frozen: undefined, termed: false });
     notice = null;
     clearTimeout(note);
     style = document.createElement("style");

@@ -87,6 +87,11 @@ test("review questions come back after 1, 3 and 7 days", () => {
   assert.equal(M.parseGrade("Not correct: the charger has to push harder."), "wrong");
   assert.equal(M.parseGrade("That isn't right. The charger has to push harder."), "wrong");
   assert.equal(M.parseGrade("Not quite right: you have half of it."), "partly");
+  assert.equal(M.parseGrade("Nope. It's the voltage."), "wrong");
+  assert.equal(M.parseGrade("Not quite. You have half of it."), "partly");
+  assert.equal(M.parseGrade("Almost: you missed the voltage."), "partly");
+  assert.equal(M.parseGrade("Mostly right, but the voltage matters."), "partly");
+  assert.equal(M.parseGrade("You have the idea. Wrong detail though: it's the voltage."), "partly", "only the first clause counts");
   assert.equal(M.parseGrade("Wrong, but close: it's the voltage that matters, not the current."), "wrong", "the first word wins");
   assert.deepEqual(M.parseDefs("1. **Graphite**: carbon in sheets.\n- lithium: a light metal\nNot a term: no", ["graphite", "lithium"]),
     { graphite: "carbon in sheets.", lithium: "a light metal" });
