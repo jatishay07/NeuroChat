@@ -11,6 +11,9 @@ let ws = null, synced = null;            // socket, and the page whose conversat
 let busy = false, turn = null, queued = [];
 let tab = null;                          // {id, url, title} of the tab the panel is following
 let conv = null;                         // {key, url, title, mode, messages: [{role, content, shown}]}
+// Study mode's side-chat features (study/panel.js) hook in here: `done` runs after each answer is
+// saved, `pending` handles hand-offs with a `kind`, and `wrapAsk` can reword a typed message.
+const hooks = { done: [], pending: {}, wrapAsk: null };
 
 // ---------- conversations ----------
 const keyOf = (url) => { try { const u = new URL(url); u.hash = ""; return u.href; } catch { return url || "none"; } };
@@ -64,6 +67,8 @@ function addUser(shown) {
   const el = document.createElement("div");
   el.className = "turn-user";
   if (shown.quote) el.append(Object.assign(document.createElement("div"), { className: "quote", textContent: shown.quote }));
+  // Study mode's look-back: the earlier paragraphs that went along with this one.
+  if (shown.also?.length) el.append(Object.assign(document.createElement("div"), { className: "also", textContent: `Also sent: ${shown.also.map((i) => `¶${i}`).join(", ")}` }));
   if (shown.text) el.append(Object.assign(document.createElement("div"), { className: "bubble", textContent: shown.text }));
   $("log").append(el);
   el.scrollIntoView({ block: "end" });
@@ -140,7 +145,8 @@ function finish(e) {
       t.conv.messages.pop(); // the question goes back out of the history, like on the companion
       checkStatus();
     }
-    if (t.conv === conv) save(); else saveOther(t.conv);
+    const saved = t.conv === conv ? save() : saveOther(t.conv);
+    saved.finally(() => { for (const f of hooks.done) try { f(t, e); } catch (err) { console.error(err); } });
   }
   if (tab && conv && keyOf(tab.url) !== conv.key) follow(tab);
   else if (queued.length) { const next = queued.shift(); next(); }
@@ -151,9 +157,10 @@ async function saveOther(c) {
   await chrome.storage.local.set({ [`conv:${c.key}`]: c });
 }
 
-// Send one user turn. content goes to the model; shown is what the chat displays.
-async function send(msg, content, shown) {
-  if (busy) { queued.push(() => send(msg, content, shown)); return; }
+// Send one user turn. content goes to the model; shown is what the chat displays; meta rides along
+// to the done hooks.
+async function send(msg, content, shown, meta) {
+  if (busy) { queued.push(() => send(msg, content, shown, meta)); return; }
   busy = true;
   $("askBtn").disabled = true;
   $("empty").hidden = true;
@@ -162,7 +169,7 @@ async function send(msg, content, shown) {
   addUser(shown);
   const t = addTutor();
   t.el.classList.add("typing");
-  turn = { ...t, text: "", conv };
+  turn = { ...t, text: "", conv, meta };
   try {
     const sock = await connect();
     if (synced !== conv.key) {
@@ -182,7 +189,7 @@ async function pageText() {
 
 // A question. The first one in a conversation takes the page's text along, so "what does this mean"
 // has something to go on.
-async function ask(text, shownText = text) {
+async function ask(text, shownText = text, meta) {
   let content = text;
   if (!conv.messages.length) {
     const page = await pageText();
@@ -190,7 +197,7 @@ async function ask(text, shownText = text) {
       content = `I'm reading "${page.title}". Here is the page:\n\n"""${page.text.slice(0, PAGE_CHARS)}"""\n\n${text}`;
     }
   }
-  send({ type: "ask", text: content }, content, { text: shownText });
+  send({ type: "ask", text: content }, content, { text: shownText }, meta);
 }
 
 // Explain a selection or a paragraph. On a page that already has a conversation it carries on there.
@@ -207,10 +214,14 @@ async function explain(req) {
   // Study mode's pace numbers (study/study-content.js), so the tutor can pitch the explanation.
   if (req.dwellMsPer100Words) msg.dwellMsPer100Words = req.dwellMsPer100Words;
   if (req.medianMsPer100Words) msg.medianMsPer100Words = req.medianMsPer100Words;
+  // Study mode's look-back: earlier paragraphs in the same section that also slowed the reader.
+  const earlier = Array.isArray(req.earlier) ? req.earlier.slice(0, 3) : [];
+  if (earlier.length) msg.earlier = earlier.map((e) => e.text);
   // What the companion builds from this; kept here so the conversation can be restored later.
   const content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
-    (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "");
-  send(msg, content, { quote: req.text, text: "Explain this" });
+    (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "") +
+    (earlier.length ? `\n\nEarlier in the same section I also slowed down on these. If my trouble starts there, say so and explain that first:\n\n${earlier.map((e) => `"""${e.text}"""`).join("\n\n")}` : "");
+  send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) }, req.key ? { ...req, study: "explain" } : undefined);
 }
 
 const CHIPS = {
@@ -224,7 +235,8 @@ async function takePending() {
   const { pending } = await chrome.storage.session.get("pending");
   if (!pending) return;
   await chrome.storage.session.remove("pending");
-  if (Date.now() - pending.at < 60_000) explain(pending);
+  if (Date.now() - pending.at >= 60_000) return;
+  if (pending.kind && hooks.pending[pending.kind]) hooks.pending[pending.kind](pending); else explain(pending);
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.pending?.newValue) takePending();
@@ -252,7 +264,7 @@ $("ask").onsubmit = (ev) => {
   if (!text || busy) return;
   input.value = "";
   grow();
-  ask(text);
+  ask(...(hooks.wrapAsk?.(text) || [text]));
 };
 
 $("newBtn").onclick = async () => {

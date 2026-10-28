@@ -78,7 +78,8 @@ try {
   });
   assert.ok(pending, "Explain reached the side chat");
   assert.match(pending.text, /^The electrochemical potential difference/);
-  assert.equal(pending.medianMsPer100Words, 3000);
+  // The usual 3 s per 100 words, raised for how dense this paragraph is (expected pace).
+  assert.ok(pending.medianMsPer100Words > 2 * 3000, String(pending.medianMsPer100Words));
   assert.ok(pending.dwellMsPer100Words >= 4500, JSON.stringify(pending));
   assert.equal(pending.url, url);
   seen.explain = { dwellMsPer100Words: pending.dwellMsPer100Words, medianMsPer100Words: pending.medianMsPer100Words };
@@ -90,7 +91,10 @@ try {
   const stored = await readings();
   assert.ok(stored.length >= 11, `baseline grew: ${stored.length}`);
   await page.keyboard.press("Escape");
-  assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study, neurochat-study").count(), 0);
+  assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study").count(), 0);
+  // What's left is the session review card; Esc again closes it.
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("neurochat-study").count(), 0);
   seen.cleanup = "Esc removes every trace";
 
   // Turning it off and on again on the same page doesn't count a paragraph twice.

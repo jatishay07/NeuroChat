@@ -134,14 +134,20 @@ def reader_notes(dwell_ms_per_100_words: float | None = None, median_ms_per_100_
 
 
 def explain_request(paragraph: str, title: str | None = None, context: str | None = None,
-                    rereads: int | None = None) -> str:
+                    rereads: int | None = None, earlier: list[str] | None = None) -> str:
     """paragraph is what to explain: a paragraph, or a passage the reader selected. context is the
     paragraph around a selection, so a short selection ("Gibbs free energy") isn't explained blind.
-    rereads is how often eye tracking saw the reader go back to it."""
+    rereads is how often eye tracking saw the reader go back to it. earlier is study mode's look-back:
+    paragraphs just before it, in the same section, that also slowed the reader down."""
     where = f' in a text titled "{title}"' if title else ""
     if rereads and rereads > 0:
         where += f" (I went back and reread it {rereads} time{'s' if rereads > 1 else ''})"
     if context and context.strip() != paragraph.strip():
-        return (f"I got stuck on this part{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\"\n\n"
+        text = (f"I got stuck on this part{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\"\n\n"
                 f"It's from this paragraph:\n\n\"\"\"{context}\"\"\"")
-    return f"I got stuck on this paragraph{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\""
+    else:
+        text = f"I got stuck on this paragraph{where}. Can you explain it differently?\n\n\"\"\"{paragraph}\"\"\""
+    if earlier:
+        text += ("\n\nEarlier in the same section I also slowed down on these. If my trouble starts there, say so "
+                 "and explain that first:\n\n" + "\n\n".join(f'"""{e}"""' for e in earlier))
+    return text

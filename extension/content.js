@@ -76,7 +76,12 @@
 
   document.addEventListener("mouseup", (e) => {
     if (e.composedPath().includes(host)) return;
-    setTimeout(() => { const sel = selection(); sel ? showFor(sel) : hide(); }, 0);
+    setTimeout(() => {
+      const sel = selection();
+      // In study mode a selection in the lit paragraph gets study mode's own "Explain selection".
+      const lit = document.documentElement.classList.contains("neurochat-study") && window.getSelection().anchorNode?.parentElement?.closest(".neurochat-current");
+      sel && !lit ? showFor(sel) : hide();
+    }, 0);
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
   addEventListener("scroll", hide, { passive: true });

@@ -28,7 +28,7 @@ async function toggleStudy(tab) {
   const toggle = () => chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" });
   try { await toggle(); } catch {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["study/study-pace.js", "study/study-content.js"] });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["study/study-pace.js", "study/study-model.js", "study/study-content.js"] });
       await toggle();
     } catch { /* a page extensions can't touch, such as chrome:// or the Web Store */ }
   }
@@ -60,3 +60,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   handOff(msg.request);
   return true; // reply is async
 });
+
+// Study mode's extras: one-off tutor questions, key terms, check-back questions.
+importScripts("study/study-bg.js");
