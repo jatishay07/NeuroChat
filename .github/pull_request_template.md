@@ -3,6 +3,7 @@
 ## How I tested it
 
 - [ ] `pytest` passes
+- [ ] `scripts/lint.sh` passes (`scripts/format.sh` fixes most of it)
 - [ ] Tried it in the app (`neurochat --simulate` or Docker) if it changes what you see
 
 ## Public-safety checklist
