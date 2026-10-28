@@ -11,9 +11,6 @@ let ws = null, synced = null;            // socket, and the page whose conversat
 let busy = false, turn = null, queued = [];
 let tab = null;                          // {id, url, title} of the tab the panel is following
 let conv = null;                         // {key, url, title, mode, messages: [{role, content, shown}]}
-// Study mode's side-chat features (study/panel.js) hook in here: `done` runs after each answer is
-// saved, `pending` handles hand-offs with a `kind`, and `wrapAsk` can reword a typed message.
-const hooks = { done: [], pending: {}, wrapAsk: null };
 
 // ---------- conversations ----------
 const keyOf = (url) => { try { const u = new URL(url); u.hash = ""; return u.href; } catch { return url || "none"; } };
@@ -145,8 +142,7 @@ function finish(e) {
       t.conv.messages.pop(); // the question goes back out of the history, like on the companion
       checkStatus();
     }
-    const saved = t.conv === conv ? save() : saveOther(t.conv);
-    saved.finally(() => { for (const f of hooks.done) try { f(t, e); } catch (err) { console.error(err); } });
+    if (t.conv === conv) save(); else saveOther(t.conv);
   }
   if (tab && conv && keyOf(tab.url) !== conv.key) follow(tab);
   else if (queued.length) { const next = queued.shift(); next(); }
@@ -157,10 +153,9 @@ async function saveOther(c) {
   await chrome.storage.local.set({ [`conv:${c.key}`]: c });
 }
 
-// Send one user turn. content goes to the model; shown is what the chat displays; meta rides along
-// to the done hooks.
-async function send(msg, content, shown, meta) {
-  if (busy) { queued.push(() => send(msg, content, shown, meta)); return; }
+// Send one user turn. content goes to the model; shown is what the chat displays.
+async function send(msg, content, shown) {
+  if (busy) { queued.push(() => send(msg, content, shown)); return; }
   busy = true;
   $("askBtn").disabled = true;
   $("empty").hidden = true;
@@ -169,7 +164,7 @@ async function send(msg, content, shown, meta) {
   addUser(shown);
   const t = addTutor();
   t.el.classList.add("typing");
-  turn = { ...t, text: "", conv, meta };
+  turn = { ...t, text: "", conv };
   try {
     const sock = await connect();
     if (synced !== conv.key) {
@@ -189,15 +184,15 @@ async function pageText() {
 
 // A question. The first one in a conversation takes the page's text along, so "what does this mean"
 // has something to go on.
-async function ask(text, shownText = text, meta) {
+async function ask(text, shownText = text) {
   let content = text;
-  if (!conv.messages.length && !meta?.study) { // study mode's questions carry their paragraph already
+  if (!conv.messages.length) {
     const page = await pageText();
     if (page && page.text) {
       content = `I'm reading "${page.title}". Here is the page:\n\n"""${page.text.slice(0, PAGE_CHARS)}"""\n\n${text}`;
     }
   }
-  send({ type: "ask", text: content, ...(meta?.task ? { task: true } : {}) }, content, { text: shownText }, meta);
+  send({ type: "ask", text: content }, content, { text: shownText });
 }
 
 // Explain a selection or a paragraph. On a page that already has a conversation it carries on there.
@@ -224,7 +219,14 @@ async function explain(req) {
     content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${String(e.text).slice(0, 600)}"""`).join("\n\n")}\n\n${content}` +
       "\n\nExplain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.";
   }
-  send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) }, req.key ? { ...req, study: "explain" } : undefined);
+  send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) });
+}
+
+// Study mode saw the reader go back to a paragraph again after it was explained: put it another way.
+async function againFor(req) {
+  if (busy) { queued.push(() => againFor(req)); return; }
+  if (!conv || keyOf(req.url) !== conv.key) return; // the reader is on another page now
+  ask("I went back to that paragraph again and it still doesn't click. Explain it a different way: simpler, with one concrete example.", "Still stuck on it");
 }
 
 const CHIPS = {
@@ -239,7 +241,8 @@ async function takePending() {
   if (!pending) return;
   await chrome.storage.session.remove("pending");
   if (Date.now() - pending.at >= 60_000) return;
-  if (pending.kind && hooks.pending[pending.kind]) hooks.pending[pending.kind](pending); else explain(pending);
+  // Study mode: still going back to a paragraph after it was explained.
+  if (pending.again) againFor(pending); else explain(pending);
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.pending?.newValue) takePending();
@@ -267,7 +270,7 @@ $("ask").onsubmit = (ev) => {
   if (!text || busy) return;
   input.value = "";
   grow();
-  ask(...(hooks.wrapAsk?.(text) || [text]));
+  ask(text);
 };
 
 $("newBtn").onclick = async () => {

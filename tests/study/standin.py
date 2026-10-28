@@ -1,5 +1,5 @@
-"""A stand-in for Ollama that answers each kind of study-mode request the way the real tutor would,
-so the extension's features can be tested (tests/study/features.mjs) and filmed
+"""A stand-in for Ollama that answers study mode's requests the way the real tutor would,
+so the extension can be tested (tests/study/features.mjs) and filmed
 (tests/study/record-features.mjs) without a model. delay > 0 streams it at reading speed."""
 import asyncio
 import json
@@ -15,26 +15,9 @@ EXPLAIN = ("In plain words: a battery has two sides, and charging only works if 
 AGAIN = ("Try it this way: picture two buckets joined by a pipe. Charging is pumping water from the low bucket to the "
          "high one. The pump (your charger) has to push harder than the water wants to flow back. The water is the "
          "lithium; the high bucket is the graphite.")
-PLAIN = ("A battery only charges when the charger pushes harder than the battery pushes back. When it does, lithium "
-         "ions move through the liquid and settle into the graphite, while electrons travel round through the wire, "
-         "so the charges on each side stay balanced.")
-QUESTION = "What has to be true before lithium ions will move into the graphite while you charge?"
-GRADE = "RIGHT. Exactly: the charger has to push harder than the battery's own voltage, or nothing moves."
-DEFS = {"electrons": "tiny charged particles; their flow through a wire is electric current.",
-        "lithium": "a very light metal whose ions carry the charge inside phone batteries.",
-        "graphite": "a form of carbon made of stacked sheets, the same as pencil lead."}
 
 
 def answer(prompt: str) -> str:
-    if "Rewrite the paragraph below in plain" in prompt:
-        return PLAIN
-    if "Define each of these terms" in prompt:
-        terms = [t.strip() for t in prompt.rsplit("Terms:", 1)[-1].split(",")]
-        return "\n".join(f"**{t}**: {DEFS.get(t.lower(), 'a key term in this text.')}" for t in terms)
-    if "Ask me one short" in prompt:
-        return QUESTION
-    if "Mark my answer" in prompt:
-        return GRADE
     if "still doesn't click" in prompt:
         return AGAIN
     return EXPLAIN

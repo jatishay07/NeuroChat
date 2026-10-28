@@ -33,11 +33,6 @@ CHAT_PROMPT = """You are a patient tutor. The person is reading something and wa
 Explain in plain language: the main idea first, then the details, defining any jargon you keep.
 Use an everyday analogy when it helps, keep answers short, and ask what is still unclear."""
 
-# For one-off tasks (study mode's plain rewrite, key-term definitions, check-back questions and marking),
-# whose answer is shown or parsed as it is: nothing around it.
-TASK_PROMPT = """Follow the instruction exactly. Reply with only what it asks for: no greeting, no preamble,
-no heading, and no follow-up question."""
-
 
 class TutorError(Exception):
     """Ollama isn't reachable or the model isn't available; the message is shown to the user."""

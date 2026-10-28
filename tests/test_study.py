@@ -119,7 +119,7 @@ def test_study_mode_in_the_extension_on_a_news_page():
 
 
 @pytest.mark.skipif(not _has_playwright(), reason="needs Node and Playwright with Chromium")
-def test_study_mode_features_in_the_extension():
+def test_study_mode_explains_hands_free_in_the_extension():
     # The extension talks to the companion on 127.0.0.1:8765, so the stand-in tutor runs there.
     import functools
     import http.server
@@ -153,11 +153,9 @@ def test_study_mode_features_in_the_extension():
         server.should_exit = True
         thread.join(timeout=5)
     prompts = [c["messages"][-1]["content"] for c in standin.chats]
-    # Look-back reached the tutor; the plainer rewrite and the definitions went as one-off questions.
+    # Look-back reached the tutor, and so did "explain it a different way".
     assert any(p.startswith("Earlier in the same section I also slowed down on:") for p in prompts)
-    assert any(p.startswith("Rewrite the paragraph below in plain words") for p in prompts)
-    assert any("Define each of these terms" in p for p in prompts)
-    assert any("Mark my answer" in p for p in prompts)
+    assert any("still doesn't click" in p for p in prompts)
 
 
 def test_look_back_paragraphs_reach_the_tutor():

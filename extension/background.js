@@ -35,7 +35,9 @@ async function toggleStudy(tab) {
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === STUDY_ID && tab) { toggleStudy(tab); return; }
+  // Study mode explains by itself, into the side chat, so the chat opens with it (Chrome only lets it
+  // open on a click or key press).
+  if (info.menuItemId === STUDY_ID && tab) { openPanel(tab); toggleStudy(tab); return; }
   if (info.menuItemId !== MENU_ID || !tab) return;
   openPanel(tab);
   // The menu only gives the selected text; ask the page for the paragraph around it.
@@ -45,7 +47,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
-  if (command === "study-page" && tab) { toggleStudy(tab); return; }
+  if (command === "study-page" && tab) { openPanel(tab); toggleStudy(tab); return; }
   if (command !== "explain-selection" || !tab) return;
   openPanel(tab);
   chrome.tabs.sendMessage(tab.id, { type: "neurochat:selection" })
@@ -60,6 +62,3 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   handOff(msg.request);
   return true; // reply is async
 });
-
-// Study mode's extras: one-off tutor questions, key terms, check-back questions.
-importScripts("study/study-bg.js");

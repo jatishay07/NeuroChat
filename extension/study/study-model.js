@@ -1,33 +1,13 @@
-// The thinking behind study mode's extra features, with no DOM, so tests/study/model.test.mjs can run
-// it under Node:
+// The thinking behind study mode's flags, with no DOM, so tests/study/model.test.mjs can run it under
+// Node:
 // - expected pace: how long THIS paragraph should take this reader, from its words and sentences, so a
 //   dense paragraph read slowly isn't flagged just for being dense;
-// - the slow threshold tuning itself from what the reader does with the flags;
-// - fatigue drift across a session; key terms on a page; when to ask a review question again; CSV.
+// - the slow threshold tuning itself from what the reader does after a flag.
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.StudyModel = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   // ---- what makes a paragraph slow to read ----
-  // Short everyday words; anything else of 7+ letters counts as a rare word. Written by hand, so no
-  // word list with its own licence comes along.
-  const COMMON = new Set(`a about above after again against all almost also always am among an and another any are
-    around as at away back be became because become been before being below between both but by came can
-    cannot could day did different do does doing done down during each even ever every few first for from
-    get give go going good got great had has have having he her here hers him his how however i if in into
-    is it its just know large last least less let like little long made make many may me might more most
-    much must my never new next no not now number of off often old on once one only or other our out over
-    own part people place put rather really right said same say see seem several she should show since
-    small so some something still such take than that the their them then there these they thing think
-    this those though three through time to together too two under until up upon us use used very want
-    was way we well were what when where whether which while who whole why will with within without word
-    work world would year yet you your already although anything around because before believe between
-    business change children company country course during example family general government group
-    however important interest something sometimes someone together another everything nothing problem
-    question remember service several something student system through without yourself whatever whenever
-    wherever usually actually probably possible different following including national personal political
-    available especially particular community possible understand everyone anybody`.split(/\s+/));
-
   const WORD = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
   const syllables = (w) => Math.max(1, (w.toLowerCase().replace(/e$/, "").match(/[aeiouy]+/g) || []).length);
 
@@ -102,104 +82,13 @@
 
   // ---- the threshold tunes itself (a staircase aiming at about 1 false flag in 10) ----
   const RATIO = { start: 1.5, min: 1.3, max: 2.0, step: 0.05, target: 0.1 };
-  // event: "false" (flagged, then left quickly with no Explain and no reread), "hit" (a flag the reader
-  // acted on), "miss" (Explain or "Still lost" on a paragraph that wasn't flagged).
+  // event: "false" (flagged, in view a while, then left without going back), "hit" (a flag the reader
+  // went back to, or had explained), "miss" (gone back to twice without ever being flagged).
   function tune(ratio, event) {
     const r = Number.isFinite(ratio) ? ratio : RATIO.start;
     const d = { false: RATIO.step, hit: -RATIO.step * RATIO.target / (1 - RATIO.target), miss: -RATIO.step }[event] || 0;
     return Math.round(Math.min(RATIO.max, Math.max(RATIO.min, r + d)) * 10000) / 10000;
   }
 
-  // ---- fatigue: getting slower than at the start of the session, against what the text predicts ----
-  const FATIGUE = { minActiveMs: 20 * 60000, window: 8, drift: 1.3, blinks: 1.5 };
-  // ratios: actual / expected for each paragraph read this session, in order. blinks (from a headset,
-  // optional): {early, late} blinks per minute. Returns {drift, why} or null.
-  function fatigue(ratios, activeMs, blinks) {
-    if (!(activeMs >= FATIGUE.minActiveMs)) return null;
-    const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
-    const r = ratios.filter((x) => Number.isFinite(x) && x > 0);
-    if (r.length >= 2 * FATIGUE.window) {
-      const drift = mean(r.slice(-FATIGUE.window)) / mean(r.slice(0, FATIGUE.window));
-      if (drift >= FATIGUE.drift) return { drift: Math.round(drift * 100) / 100, why: "pace" };
-    }
-    if (blinks && blinks.early > 0 && blinks.late / blinks.early >= FATIGUE.blinks) return { drift: Math.round(blinks.late / blinks.early * 100) / 100, why: "blinks" };
-    return null;
-  }
-
-  // ---- key terms: rare words the page leans on ----
-  function keyTerms(texts, n = 3) {
-    const count = new Map(), lower = new Set();
-    const all = texts.flatMap((t) => String(t).match(WORD) || []);
-    const seen = new Set(all.map((w) => w.toLowerCase()));
-    for (const w of all) {
-      let k = w.toLowerCase().replace(/['’]s$/, "");
-      if (/s$/.test(k) && seen.has(k.slice(0, -1))) k = k.slice(0, -1); // "electrodes" counts as "electrode"
-      if (w[0] === w[0].toLowerCase()) lower.add(k);
-      // Key terms are nearly always nouns: -ed, -ing and -ly words are left out.
-      if (k.length < 7 || COMMON.has(k) || /\d/.test(k) || /(ed|ing|ly)$/.test(k)) continue;
-      count.set(k, (count.get(k) || 0) + 1);
-    }
-    // A word never written in lower case is a name (Gibbs, Tesla), not a term to define.
-    return [...count].filter(([k, c]) => c >= 2 && lower.has(k))
-      .map(([k, c]) => [k, c * Math.log(k.length) * (1 + syllables(k) / 4)])
-      .sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
-  }
-
-  // ---- review questions come back after 1, 3, then 7 days ----
-  const DAYS = [1, 3, 7];
-  const DAY = 86400000;
-  // step = right answers in a row. Right: the next gap (1, then 3, then 7 days; learned after that).
-  // Partly: the same gap again. Wrong: back to 1 day.
-  function schedule(item, grade, now = Date.now()) {
-    let step = item.step || 0;
-    if (grade === "right") step++;
-    else if (grade === "wrong") step = 0;
-    if (step > DAYS.length) return { ...item, step, due: null, last: grade };
-    return { ...item, step, due: now + DAYS[Math.max(0, step - 1)] * DAY, last: grade };
-  }
-  // The mark at the start of the tutor's reply; anything it can't read counts as "partly".
-  function parseGrade(text) {
-    const head = String(text).replace(/[*_#>"“]/g, "").trim().slice(0, 60).toLowerCase();
-    const first = /^(?:grade|mark|verdict)?\s*:?\s*([a-z]+)/.exec(head)?.[1];
-    const word = { right: "right", correct: "right", yes: "right", partly: "partly", partially: "partly", partial: "partly", almost: "partly",
-      close: "partly", mostly: "partly", wrong: "wrong", incorrect: "wrong", no: "wrong", nope: "wrong" }[first];
-    if (word) return word;
-    const clause = head.split(/[.:;!—–]/)[0]; // "That's right that it rises, but…" shouldn't read as right past the first clause
-    if (first === "not" || /\b(not|isn't|isn’t|wasn't|aren't|n't)\s+(quite\s+)?(right|correct)\b/.test(clause)) return /\bquite\b/.test(clause) ? "partly" : "wrong";
-    const m = /\b(right|correct|partly|partially|wrong|incorrect)\b/.exec(clause);
-    return m ? { right: "right", correct: "right", wrong: "wrong", incorrect: "wrong" }[m[1]] || "partly" : "partly";
-  }
-  // "term: definition" lines (with or without bold, bullets or numbers) for the terms asked about.
-  function parseDefs(text, terms) {
-    const want = new Set(terms.map((t) => t.toLowerCase())), out = {};
-    for (const line of String(text).split("\n")) {
-      const d = /^\s*(?:[-*•]|\d+[.)])?\s*\**\s*([^:*]+?)\s*\**\s*:\s*\**\s*(.+)$/.exec(line);
-      if (d && want.has(d[1].toLowerCase())) out[d[1].toLowerCase()] = d[2].replace(/\*\*/g, "").trim();
-    }
-    return out;
-  }
-
-  // A small model still wraps answers sometimes ("Here's a simpler version:" … "Does that help?").
-  function bare(text) {
-    const lines = String(text).trim().split("\n").map((l) => l.trim()).filter(Boolean);
-    if (lines.length > 1 && /:$/.test(lines[0])) lines.shift();
-    let t = lines.join(" ").replace(/^["“]+|["”]+$/g, "");
-    const cut = t.replace(/\s*[^.!?]*\?\s*$/, "");
-    if (cut.length > t.length * 0.5) t = cut; // a trailing question, unless that's most of it
-    return t.trim();
-  }
-
-  // ---- the session as a CSV, one row per paragraph ----
-  function toCSV(rows) {
-    if (!rows.length) return "";
-    const cols = Object.keys(rows[0]);
-    const cell = (v) => {
-      let s = v === null || v === undefined ? "" : String(v);
-      if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`; // page text must not run as a spreadsheet formula
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    return [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\n") + "\n";
-  }
-
-  return { COMMON, W0, FIT_AFTER, RATIO, FATIGUE, DAYS, features, fit, predict, tune, fatigue, keyTerms, schedule, parseGrade, parseDefs, bare, toCSV };
+  return { W0, FIT_AFTER, RATIO, features, fit, predict, tune };
 });
