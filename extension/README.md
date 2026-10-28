@@ -46,13 +46,13 @@ portal's `/study.html` (`study/study-pace.js`).
 
 ## How it works
 
-| File | Job |
-|---|---|
-| `content.js` | On every page: the Explain button, the selection plus its paragraph, and the page's text |
-| `background.js` | Opens the side panel and hands it the request (right-click menu, shortcut, button) |
-| `sidepanel.html/.js/.css` | The chat, one saved conversation per page; streams answers from the companion over `ws://127.0.0.1:8765/ws/chat` |
-| `study/study-content.js`, `study/study-pace.js` | Study mode: dims the page, follows the reading line, times each paragraph against your usual pace |
-| `markdown.js` | Formats answers (lists, bold, code) safely |
+| File                                            | Job                                                                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `content.js`                                    | On every page: the Explain button, the selection plus its paragraph, and the page's text                         |
+| `background.js`                                 | Opens the side panel and hands it the request (right-click menu, shortcut, button)                               |
+| `sidepanel.html/.js/.css`                       | The chat, one saved conversation per page; streams answers from the companion over `ws://127.0.0.1:8765/ws/chat` |
+| `study/study-content.js`, `study/study-pace.js` | Study mode: dims the page, follows the reading line, times each paragraph against your usual pace                |
+| `markdown.js`                                   | Formats answers (lists, bold, code) safely                                                                       |
 
 The `scripting` permission lets study mode start in tabs that were open before the extension was installed.
 
