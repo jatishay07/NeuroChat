@@ -7,18 +7,26 @@
   "action": { "default_title": "Open the NeuroChat side chat", "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" } },
   "side_panel": { "default_path": "sidepanel.html" },
   "background": { "service_worker": "background.js" },
-  "permissions": ["sidePanel", "contextMenus", "storage", "tabs"],
+  "permissions": ["sidePanel", "contextMenus", "storage", "tabs", "scripting"],
   "host_permissions": ["http://127.0.0.1:8765/*"],
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content.js"],
     "css": ["content.css"],
     "run_at": "document_idle"
+  }, {
+    "matches": ["<all_urls>"],
+    "js": ["study/study-pace.js", "study/study-content.js"],
+    "run_at": "document_idle"
   }],
   "commands": {
     "explain-selection": {
       "suggested_key": { "default": "Alt+Shift+E" },
       "description": "Explain the selected text in the side chat"
+    },
+    "study-page": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Study mode on this page: light the paragraph you're reading and notice the slow ones"
     }
   }
 }
