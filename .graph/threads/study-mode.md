@@ -26,3 +26,10 @@ Owned by the `study-mode` thread; only it edits this file.
 - Tests: tests/study/extension.mjs (news page, tricky real-site shapes, empty page); demo video by tests/study/record-extension.mjs.
 - Open question for Atishay: focus mode only, passive, or both (decision card); building focus mode meanwhile.
 - 2026-10-28: #39 merged (0d7e416). Integrator asked about the two pace-engine copies: `test_extension_uses_the_same_pace_engine` fails on any byte difference, so they can't drift. Follow-up: the Explain handoff check in tests/study/extension.mjs raced the side panel deleting `pending` (seen on #40), so it now listens for the storage write instead of polling.
+
+## 2026-10-28: minimal, hands-free study mode (#42)
+
+- Atishay picked none of the 13 as a list: he wants the minimum on screen and no buttons, driven by intent.
+- Node: Reviewer → draft PR. `[Reviewer] 1 critique round → 12 findings fixed → suite green → draft PR`.
+- Open question (decision card): before the headset, auto-explain on slow + reread (built), a quiet cue, or headset only.
+- No READY until Atishay is happy with the video.

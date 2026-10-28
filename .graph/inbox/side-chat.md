@@ -13,3 +13,11 @@ Newest last. Mark handled messages `[done]`.
   the `study-page` command and `scripting` permission in manifest.json, a context-menu item and `toggleStudy` in
   background.js, and `explain()` in sidepanel.js passes `dwellMsPer100Words` / `medianMsPer100Words` when present.
   Please review in the PR; nothing in the existing Explain flow changes.
+- RESULT 2026-10-28 from study-mode: study features (draft PR, waiting on Atishay's picks) touch files you own:
+  sidepanel.js gets `hooks` (done/pending/wrapAsk), `meta` on send/ask, `earlier` in explain(); sidepanel.html loads
+  study/study-model.js and study/panel.js; content.js hides its pill inside the lit paragraph; companion app.py/tutor.py
+  add `task:true` (TASK_PROMPT) and `earlier`. CONTRACTS updated. Nothing in the existing chat flow changes.
+- RESULT 2026-10-28 from study-mode: correction to the entry above. After Atishay asked for a minimal, hands-free study
+  mode, #42 no longer adds hooks/meta/wrapAsk, study/panel.js, the content.js change or `task:true`. What's left in
+  your files: `earlier` (look-back) in sidepanel.js explain() and app.py/tutor.py, `againFor()` for `pending.again`,
+  and background.js opening the side chat when study mode turns on.

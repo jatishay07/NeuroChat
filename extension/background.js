@@ -24,11 +24,18 @@ function openPanel(tab) {
 
 // Study mode is switched on and off in the page itself. Tabs opened before the extension was
 // installed or updated don't have its script yet, so put it there first.
+// Tabs with study mode on, so turning it on opens the side chat (it explains in there by itself) and
+// turning it off doesn't. Lost if Chrome stops the worker; then turning off opens the chat too, harmlessly.
+const studying = new Set();
+chrome.tabs.onRemoved.addListener((id) => studying.delete(id));
+chrome.tabs.onUpdated.addListener((id, info) => { if (info.status === "loading") studying.delete(id); });
+
 async function toggleStudy(tab) {
-  const toggle = () => chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" });
+  if (!studying.has(tab.id)) openPanel(tab); // first, while the click or key press still counts
+  const toggle = async () => { const r = await chrome.tabs.sendMessage(tab.id, { type: "neurochat:study" }); if (r?.on) studying.add(tab.id); else studying.delete(tab.id); };
   try { await toggle(); } catch {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["study/study-pace.js", "study/study-content.js"] });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["study/study-pace.js", "study/study-model.js", "study/study-content.js"] });
       await toggle();
     } catch { /* a page extensions can't touch, such as chrome:// or the Web Store */ }
   }

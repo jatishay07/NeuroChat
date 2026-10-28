@@ -223,7 +223,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         """One conversation with the tutor. The client sends
         {"type": "explain", "paragraph": ..., "title": ..., "context": ...} to start on a paragraph
         (or a selected passage, with the paragraph around it as optional context), optionally with what
-        the reading page measured: "index", "dwellMsPer100Words", "medianMsPer100Words", "rereads"; or
+        the reading page measured: "index", "dwellMsPer100Words", "medianMsPer100Words", "rereads", and
+        "earlier" (study mode's look-back: up to 3 earlier paragraphs that also slowed the reader); or
         {"type": "ask", "text": ...} for a follow-up. Replies stream back as
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
         or {"type": "error", "message": ...}.
@@ -268,8 +269,10 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                         history = []
                     passage = msg   # an appended passage brings its own numbers too
                     system = base + signals_for(passage)
+                    # Study mode's look-back: a few earlier paragraphs, kept short for a small model.
+                    earlier = [e[:600] for e in msg.get("earlier") or [] if isinstance(e, str) and e.strip()][:3] if isinstance(msg.get("earlier"), list) else []
                     history.append({"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000],
-                                                         msg.get("rereads") if isinstance(msg.get("rereads"), int) else None)})
+                                                         msg.get("rereads") if isinstance(msg.get("rereads"), int) else None, earlier or None)})
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
                     if not history:  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]

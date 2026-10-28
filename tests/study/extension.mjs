@@ -55,15 +55,9 @@ try {
   const edge = await page.evaluate(() => getComputedStyle(document.querySelector(".neurochat-current")).boxShadow);
   assert.match(edge, /rgba\(229, 138, 0/);
   assert.equal(await page.locator("[role=dialog]:visible, dialog[open]").count(), 0);
-  seen.slow = "amber edge, dark Explain pill";
+  seen.slow = "amber edge, nothing to press";
 
-  // Explain hands the paragraph and its pace to the side chat.
-  const pill = await page.evaluateHandle(() => document.querySelector("neurochat-study"));
-  assert.ok(pill);
-  const box = await page.evaluate(() => {
-    const r = document.querySelector(".neurochat-current").getBoundingClientRect();
-    return { x: Math.min(r.right + 40, innerWidth - 40), y: Math.max(r.top, 8) + 14 };
-  });
+  // Slow, then gone back to after a while: the paragraph and its pace go to the side chat by themselves.
   // Catch the handoff as it is written: the side panel deletes "pending" as soon as it reads it.
   await sw.evaluate(() => {
     self.__pending = null;
@@ -71,14 +65,18 @@ try {
       if (area === "session" && changes.pending?.newValue && !self.__pending) self.__pending = changes.pending.newValue;
     });
   });
-  await page.mouse.click(box.x, box.y);
+  await page.keyboard.press("j");
+  await page.waitForTimeout(3200);
+  await page.keyboard.press("k");
   const pending = await sw.evaluate(async () => {
     for (let k = 0; k < 50 && !self.__pending; k++) await new Promise((r) => setTimeout(r, 100));
     return self.__pending;
   });
-  assert.ok(pending, "Explain reached the side chat");
+  assert.ok(pending, "the explanation request reached the side chat");
+  assert.equal(pending.trigger, "auto");
   assert.match(pending.text, /^The electrochemical potential difference/);
-  assert.equal(pending.medianMsPer100Words, 3000);
+  // The usual 3 s per 100 words, raised for how dense this paragraph is (expected pace).
+  assert.ok(pending.medianMsPer100Words > 2 * 3000, String(pending.medianMsPer100Words));
   assert.ok(pending.dwellMsPer100Words >= 4500, JSON.stringify(pending));
   assert.equal(pending.url, url);
   seen.explain = { dwellMsPer100Words: pending.dwellMsPer100Words, medianMsPer100Words: pending.medianMsPer100Words };
@@ -90,7 +88,8 @@ try {
   const stored = await readings();
   assert.ok(stored.length >= 11, `baseline grew: ${stored.length}`);
   await page.keyboard.press("Escape");
-  assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study, neurochat-study").count(), 0);
+  assert.equal(await page.locator(".neurochat-dim, .neurochat-current, html.neurochat-study").count(), 0);
+  assert.equal(await page.locator("neurochat-study").count(), 0);
   seen.cleanup = "Esc removes every trace";
 
   // Turning it off and on again on the same page doesn't count a paragraph twice.

@@ -207,10 +207,26 @@ async function explain(req) {
   // Study mode's pace numbers (study/study-content.js), so the tutor can pitch the explanation.
   if (req.dwellMsPer100Words) msg.dwellMsPer100Words = req.dwellMsPer100Words;
   if (req.medianMsPer100Words) msg.medianMsPer100Words = req.medianMsPer100Words;
+  // Study mode's look-back: earlier paragraphs in the same section that also slowed the reader.
+  const earlier = Array.isArray(req.earlier) ? req.earlier.slice(0, 3) : [];
+  if (earlier.length) msg.earlier = earlier.map((e) => String(e.text).slice(0, 600)); // the companion keeps 600 too
   // What the companion builds from this; kept here so the conversation can be restored later.
-  const content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
+  let content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
     (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "");
+  if (earlier.length) {
+    content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${String(e.text).slice(0, 600)}"""`).join("\n\n")}\n\n${content}` +
+      "\n\nExplain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.";
+  }
   send(msg, content, { quote: req.text, text: "Explain this" });
+}
+
+// Study mode saw the reader go back to a paragraph again after it was explained: put it another way.
+async function againFor(req) {
+  if (busy) { queued.push(() => againFor(req)); return; }
+  if (!conv || keyOf(req.url) !== conv.key) return; // the reader is on another page now
+  // The paragraph goes along: something else may have been explained since.
+  const text = `I went back to this paragraph again and it still doesn't click. Explain it a different way: simpler, with one concrete example.\n\n"""${req.text}"""`;
+  send({ type: "ask", text }, text, { quote: req.text, text: "Still stuck on it" });
 }
 
 const CHIPS = {
@@ -224,7 +240,9 @@ async function takePending() {
   const { pending } = await chrome.storage.session.get("pending");
   if (!pending) return;
   await chrome.storage.session.remove("pending");
-  if (Date.now() - pending.at < 60_000) explain(pending);
+  if (Date.now() - pending.at >= 60_000) return;
+  // Study mode: still going back to a paragraph after it was explained.
+  if (pending.again) againFor(pending); else explain(pending);
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.pending?.newValue) takePending();

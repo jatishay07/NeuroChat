@@ -16,7 +16,7 @@
     "run_at": "document_idle"
   }, {
     "matches": ["<all_urls>"],
-    "js": ["study/study-pace.js", "study/study-content.js"],
+    "js": ["study/study-pace.js", "study/study-model.js", "study/study-content.js"],
     "run_at": "document_idle"
   }],
   "commands": {
