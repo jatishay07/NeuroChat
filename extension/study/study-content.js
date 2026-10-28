@@ -12,16 +12,16 @@
   const FLAGS_KEY = "neurochat.study.features", RATIO_KEY = "neurochat.study.ratio";
   const KEEP = 200;
   const REREAD_MS = 2000;  // back on a paragraph you'd left for this long = a reread, not an overshoot
-  const QUICK_MS = 10000;  // flagged, then gone this soon with no Explain and no reread = probably a false flag
+  const IGNORED_MS = 10000; // flagged, seen this long, then left with no Explain and no reread = a flag they didn't need
 
   // Every feature, on unless switched off (the headset simulator is for developers, so it's off).
   const FEATURES = { expected: true, rereads: true, signals: true, simulator: false, explainKey: true, selection: true,
-    lookback: true, labels: true, tune: true, plainer: true, checkback: true, review: true, fatigue: true, terms: true };
+    lookback: true, labels: true, tune: true, plainer: true, checkback: true, review: true, export: true, fatigue: true, terms: true };
   let flags = { ...FEATURES };
   const has = (f) => !!flags[f];
 
   let on = false, paras = [], at = -1, raf = 0, ticker = 0, ticks = 0, watcher = null, recollect = 0;
-  let model = null, ratio = M.RATIO.start, session = null;
+  let ratio = M.RATIO.start, session = null;
   const samples = new Map(); // paragraph key -> {v, t, x, h}
   const labels = new Map();  // paragraph key -> "got" | "lost"
   const state = new WeakMap(); // element -> its clock, visits, slow, frozen pace (survives re-collecting)
@@ -41,7 +41,7 @@
   chrome.storage.onChanged.addListener((c, area) => {
     if (area !== "local") return;
     for (const [k, { newValue }] of Object.entries(c)) {
-      if (k === FLAGS_KEY) { flags = { ...FEATURES, ...(newValue || {}) }; if (on) { mark(); sim(); } }
+      if (k === FLAGS_KEY) { flags = { ...FEATURES, ...(newValue || {}) }; if (on) switched(); }
       else if (k === RATIO_KEY && Number.isFinite(newValue)) ratio = newValue;
       else if (k.startsWith(LABELS)) labels.set(k.slice(LABELS.length), newValue?.label);
       else if (k.startsWith(PREFIX)) {
@@ -55,7 +55,13 @@
     for (const ch of location.origin + location.pathname + "\n" + text) h = (h * 33 + ch.codePointAt(0)) >>> 0;
     return h.toString(36);
   }
-  function refit() { model = M.fit([...samples.values()], location.hostname); }
+  // Fitted without the paragraph itself, like stats(): a paragraph is never compared with itself.
+  let fits = new Map();
+  function refit() { fits = new Map(); }
+  function modelFor(p) {
+    if (!fits.has(p.key)) fits.set(p.key, M.fit([...samples].filter(([k]) => k !== p.key).map(([, s]) => s), location.hostname));
+    return fits.get(p.key);
+  }
   async function record(p) {
     const v = value(p);
     if (!v) return;
@@ -77,7 +83,8 @@
   function expected(p) {
     const { median, samples: n } = stats(p);
     if (!median || n < P.MIN_SAMPLES) return null;
-    return has("expected") && model ? M.predict(model, p.x) : median;
+    const model = has("expected") && modelFor(p);
+    return model ? M.predict(model, p.x) : median;
   }
   const threshold = () => (has("tune") ? ratio : M.RATIO.start);
   function slowness(p) { const e = expected(p), v = value(p); return e && v ? v / e : null; }
@@ -139,7 +146,7 @@
   const value = (p) => p.frozen !== undefined ? p.frozen : P.msPer100Words(p.clock.elapsed(), p.words);
 
   let rereadTimer = 0;
-  function leave() {
+  function leave(judge = false) {
     const p = paras[at];
     at = -1;
     clearTimeout(rereadTimer);
@@ -147,8 +154,9 @@
     if (!p) return;
     p.clock.stop();
     p.last = Date.now();
-    // Flagged, and gone soon after with nothing done about it: the flag probably wasn't needed.
-    if (p.slow && !p.acted && !p.judged && p.last - p.slowAt < QUICK_MS) { p.judged = true; tune("false"); }
+    // Flagged, the flag in view for a while, and left with nothing done about it: not needed. (Leaving
+    // just after the flag says nothing: it appears as a slow reader is finishing anyway.)
+    if (judge && p.slow && !p.acted && !p.judged && p.last - p.slowAt >= IGNORED_MS) { p.judged = true; tune("false"); }
     record(p);
     p.el.classList.remove("neurochat-current");
     p.el.classList.add("neurochat-dim");
@@ -157,7 +165,7 @@
   function focus(i) {
     if (i === at) return;
     const from = at;
-    leave();
+    leave(i >= 0);
     if (i < 0) { draw(); return; }
     at = i;
     const p = paras[i];
@@ -168,7 +176,7 @@
     if (!document.hidden && !p.plain) p.clock.start();
     // Back on a paragraph you'd already left, and staying there: a reread.
     if (has("rereads") && p.last && from > i) rereadTimer = setTimeout(() => { if (paras[at] === p) signal({ kind: "reread", source: "scroll", para: i }); }, REREAD_MS);
-    if (from >= 0 && paras[from] && p.section !== paras[from].section) sectionChanged(paras[from].section);
+    if (from >= 0 && from < i) offerCheck(i, paras[from]);
     mark();
   }
 
@@ -188,6 +196,7 @@
   function signal(s) {
     if (!on || !s || typeof s.kind !== "string") return;
     s = { t: Date.now(), source: "page", ...s };
+    if (s.source !== "scroll" && !has("signals")) return;
     session.signals.push(s);
     if (session.signals.length > 2000) session.signals.shift();
     const i = Number.isInteger(s.para) ? s.para : at;
@@ -275,10 +284,10 @@
     .sim span { font: 600 11px ${FONT}; color: #8a8f99; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px 2px; }
     @media (max-width: 480px) { .dock #cue { display: none; } }
   </style>
-  <div class="pills" id="pills" hidden><button type="button" class="pill" id="pill">Explain</button><button type="button" class="pill quiet" id="alt" hidden>Original</button></div>
+  <div class="pills" id="pills" hidden><button type="button" class="pill" id="pill" title="Explain (E)">Explain</button><button type="button" class="pill quiet" id="alt" title="Plainer (P)" hidden>Plainer</button></div>
   <div class="line" id="line" hidden></div>
   <div class="glass dock" id="dock" role="status" hidden><i></i><b>Study mode</b><span class="count" id="count"></span><span id="cue"></span><button type="button" class="offer" id="offer" hidden></button><button type="button" id="close" aria-label="Dismiss" hidden>✕</button><button type="button" id="exit" aria-label="Turn off study mode">Exit</button></div>
-  <div class="glass card" id="card" role="dialog" aria-label="Study session" hidden><p id="sum"></p><div class="ticks" id="ticks"></div><div class="row"><button type="button" id="csv">Download CSV</button><button type="button" id="done">Close</button></div></div>
+  <div class="glass card" id="card" role="status" aria-label="Study session" hidden><p id="sum"></p><div class="ticks" id="ticks"></div><div class="row"><button type="button" id="csv" title="Every paragraph's timing, for research">Download data (CSV)</button><button type="button" id="done">Close</button></div></div>
   <div class="glass sim" id="sim" hidden><span>Headset simulator</span><button type="button" data-k="reread">Reread line 2</button><button type="button" data-k="clench">Jaw clench</button><button type="button" data-k="blink">Blink</button></div>`;
   const $ = (id) => root.getElementById(id);
 
@@ -294,7 +303,7 @@
     $("pill").textContent = sel ? "Explain selection" : "Explain";
     $("pill").classList.toggle("slow", p.slow);
     $("pill").setAttribute("aria-label", sel ? "Explain the selected text with NeuroChat" : `Explain paragraph ${at + 1} with NeuroChat`);
-    $("alt").hidden = !p.plainText;
+    $("alt").hidden = !has("plainer") || !(p.plainText || p.slow || p.writing);
     $("alt").textContent = p.plain ? "Original" : "Plainer";
     const r = p.el.getBoundingClientRect();
     const w = $("pills").offsetWidth || 80, h = $("pill").offsetHeight || 30;
@@ -318,8 +327,8 @@
   }
   // A line in the dock that stays until dismissed (fatigue), with an optional offer button (check-back).
   let notice = null;
-  function tell(text, offer) {
-    notice = { text, offer };
+  function tell(text, offer, kind) {
+    notice = { text, offer, kind };
     $("cue").textContent = text;
     $("offer").hidden = !offer;
     if (offer) $("offer").textContent = offer.label;
@@ -375,23 +384,25 @@
   function sim() { $("sim").hidden = !on || !has("simulator"); }
 
   // ---- plainer: the lit paragraph rewritten in plain words, in place, with the original a tap away ----
+  const rewritten = new Set(), ports = new Set();
   function plainer(p) {
-    if (!has("plainer")) return;
-    if (p.plainText !== undefined && !p.writing) { // switch between the two
+    if (p.plainText !== undefined && !p.writing) { // switch between the two (back to the original even if switched off)
+      if (!p.plain && !has("plainer")) return;
       if (p.plain) { p.el.replaceChildren(...p.original); p.plain = false; }
       else { p.el.replaceChildren(document.createTextNode(p.plainText)); p.plain = true; }
       p.el.classList.toggle("neurochat-plain", p.plain);
       draw();
       return;
     }
-    if (p.writing) return;
+    if (p.writing || !has("plainer")) return;
     if (p.frozen === undefined) { p.frozen = value(p); p.clock.stop(); }
     p.original = [...p.el.childNodes];
+    rewritten.add(p);
     p.writing = true; p.plain = true; p.plainText = "";
     p.el.classList.add("neurochat-plain");
     const out = document.createTextNode("…");
     p.el.replaceChildren(out);
-    const port = chrome.runtime.connect({ name: "neurochat:oneshot" });
+    const port = oneshot();
     port.onMessage.addListener((m) => {
       if (m.type === "token") { p.plainText += m.text; out.data = p.plainText; }
       else {
@@ -400,39 +411,68 @@
           p.el.replaceChildren(...p.original); p.plain = false; p.plainText = undefined;
           p.el.classList.remove("neurochat-plain");
           if (m.type === "error") tell(m.message);
-        } else p.plainText = p.plainText.trim().replace(/^"+|"+$/g, "");
-        port.disconnect();
+        } else { p.plainText = M.bare(p.plainText); out.data = p.plainText; }
+        port.close();
         draw();
       }
     });
-    port.postMessage({ prompt: "Rewrite the paragraph below in plain language for someone new to the topic. Keep every fact, keep it " +
-      "the same length or shorter, and define any technical term you keep. Reply with only the rewritten paragraph: no title, " +
-      `no preamble, no quotes.\n\n"""${p.text.slice(0, 3000)}"""` });
+    port.postMessage({ prompt: "Rewrite the paragraph below in plain words for someone new to the topic. Same facts, no longer than " +
+      `the original. Reply with the paragraph only.\n\n"""${p.text.slice(0, 3000)}"""` });
     draw();
   }
-  function unplain() { for (const p of paras) if (p.original) { p.el.replaceChildren(...p.original); p.el.classList.remove("neurochat-plain"); p.plain = false; } }
+  function unplain() {
+    for (const p of rewritten) { p.el.replaceChildren(...p.original); p.el.classList.remove("neurochat-plain"); Object.assign(p, { plain: false, writing: false, plainText: undefined, original: undefined }); }
+    rewritten.clear();
+  }
+  // A one-off question to the tutor (study-bg.js), closed at Exit if it's still running.
+  function oneshot() {
+    const port = chrome.runtime.connect({ name: "neurochat:oneshot" });
+    ports.add(port);
+    port.close = () => { ports.delete(port); try { port.disconnect(); } catch { /* gone */ } };
+    port.onDisconnect.addListener(() => ports.delete(port));
+    return port;
+  }
 
-  // ---- check-back: leaving a section you struggled in offers one question on it (never by itself) ----
-  function sectionChanged(left) {
-    if (!has("checkback")) return;
-    const hard = paras.filter((q) => q.section === left && !q.checked && (q.explained || (q.slow && q.rereads > 0)));
-    if (!hard.length) { if (notice?.offer) untell(); return; }
+  // ---- check-back: moving on from a paragraph you struggled with offers one question on it, once
+  // you've left its section or read 6 more paragraphs (never by itself; dismissible) ----
+  function offerCheck(i, from) {
+    if (!has("checkback") || (notice && notice.kind !== "check")) return;
+    const hard = paras.filter((q, k) => k < i && !q.checked && (q.explained || (q.slow && q.rereads > 0)) && (q.section !== paras[i].section || i - k >= 6));
+    if (!hard.length || (notice?.offer && from.section === paras[i].section)) return;
     const q = hard.sort((a, b) => (slowness(b) || 0) - (slowness(a) || 0))[0];
-    tell("", { label: `One question on ¶${paras.indexOf(q) + 1}?`, run: () => {
+    tell("", { label: "Quick check on what you just read?", run: () => {
       q.checked = true;
       chrome.runtime.sendMessage({ type: "neurochat:check", request: { text: q.text.slice(0, 3000), title: document.title, url: location.href, key: q.key, index: paras.indexOf(q) + 1 } }).catch(() => {});
-    } });
+    } }, "check");
   }
 
   // ---- key terms: listed in the side chat before you read, underlined only where you slow down ----
   let keyTerms = [], defs = {};
+  // The side chat lists them under "Before you read"; the definitions come from the tutor straight away.
+  function define(terms) {
+    const note = (extra) => chrome.runtime.sendMessage({ type: "neurochat:terms", terms, url: location.href, title: document.title, ...extra }).catch(() => {});
+    note({});
+    let text = "";
+    const port = oneshot();
+    port.onMessage.addListener((m) => {
+      if (m.type === "token") { text += m.text; return; }
+      port.close();
+      if (m.type !== "done") return;
+      defs = M.parseDefs(text, terms);
+      for (const s of document.querySelectorAll("span.neurochat-term")) s.title = defs[s.textContent.toLowerCase()] || s.title;
+      note({ defs });
+    });
+    port.postMessage({ prompt: `I'm about to read "${document.title}". Define each of these terms in one plain sentence, as the text probably ` +
+      `uses it. One line each, as: term: definition\n\nTerms: ${terms.join(", ")}` });
+  }
   function terms(p) {
     if (!has("terms") || !keyTerms.length || p.plain || p.termed) return;
     p.termed = true;
     const re = new RegExp(`\\b(${keyTerms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "gi");
     const walk = document.createTreeWalker(p.el, NodeFilter.SHOW_TEXT);
     const nodes = [];
-    while (walk.nextNode()) if (re.test(walk.currentNode.data)) nodes.push(walk.currentNode);
+    const any = new RegExp(re.source, "i"); // no "g": test() would carry lastIndex from one node to the next
+    while (walk.nextNode()) if (any.test(walk.currentNode.data)) nodes.push(walk.currentNode);
     for (const n of nodes) {
       const frag = document.createDocumentFragment();
       let last = 0;
@@ -450,14 +490,16 @@
     }
   }
   function unterm() {
-    for (const s of document.querySelectorAll("span.neurochat-term")) s.replaceWith(s.textContent);
-    for (const p of paras) { p.termed = false; p.el.normalize(); }
+    const parents = new Set();
+    for (const s of document.querySelectorAll("span.neurochat-term")) { parents.add(s.parentNode); s.replaceWith(s.textContent); }
+    parents.forEach((n) => n?.normalize()); // joins back only the text nodes study mode split
+    for (const p of paras) p.termed = false;
   }
 
   // ---- fatigue: much slower than at the start of the session, for the same kind of text ----
   let rested = 0;
   function tired() {
-    if (!has("fatigue") || notice || Date.now() - rested < 30 * 60000) return;
+    if (!has("fatigue") || (notice && notice.kind !== "check") || Date.now() - rested < 30 * 60000) return;
     const read = paras.filter((p) => p.last && value(p)).sort((a, b) => a.last - b.last);
     const active = paras.reduce((s, p) => s + p.clock.elapsed(), 0) + session.extraMs;
     const n = session.blinks.length, mid = session.start + (Date.now() - session.start) / 2;
@@ -466,7 +508,8 @@
     const f = M.fatigue(read.map(slowness), active, blinks);
     if (!f) return;
     rested = Date.now();
-    tell(f.why === "pace" ? `About ${Math.round((f.drift - 1) * 100)}% slower than when you started. Break?` : "You're blinking a lot more than earlier. Break?");
+    tell(f.why === "pace" ? "You've slowed down since you started. A short break helps it stick." : "You're blinking much more than earlier. A short break helps it stick.",
+      { label: "Take a break", run: () => stop() }, "tired");
   }
 
   // ---- the session at Exit: what was hard, and the numbers as a CSV ----
@@ -483,11 +526,12 @@
   }
   function review() {
     const r = rows();
-    if (!has("review") || !r.some((x) => x.actual_ms_per_100_words)) return false;
+    if (!has("review") || r.filter((x) => x.actual_ms_per_100_words).length < 5) return false;
     const words = r.reduce((s, x) => s + x.words, 0), hard = r.filter((x) => x.slow).length;
     const mins = Math.max(1, Math.round((Date.now() - session.start) / 60000));
-    $("sum").innerHTML = `<b>${r.length} paragraph${r.length > 1 ? "s" : ""}</b>, ${words} words in ${mins} min. ` +
-      (hard ? `<b>${hard}</b> took you much longer than usual; they're the darker bars.` : "Nothing took you much longer than usual.");
+    $("sum").innerHTML = `<b>${r.length} paragraphs</b>, ${words} words in ${mins} min. ` +
+      (hard ? `<b>${hard}</b> slowed you down (amber; light amber was a little slow). Tap a bar to go back to it.` : "Nothing slowed you down much. Tap a bar to go back to a paragraph.");
+    $("csv").hidden = !has("export");
     const els = new Map(paras.map((p, i) => [i + 1, p.el]));
     $("ticks").replaceChildren(...r.map((x) => {
       const b = document.createElement("button");
@@ -513,6 +557,16 @@
   function closeReview() { $("card").hidden = true; removeEventListener("keydown", closeOnEsc, true); if (!on) host.remove(); }
   function closeOnEsc(e) { if (e.key === "Escape") closeReview(); }
   $("done").addEventListener("click", closeReview);
+
+  // A switch turned off mid-session takes its traces with it.
+  function switched() {
+    if (!has("terms")) unterm();
+    if (!has("plainer")) unplain();
+    if ((notice?.kind === "check" && !has("checkback")) || (notice?.kind === "tired" && !has("fatigue"))) untell();
+    document.documentElement.toggleAttribute("data-neurochat-selection", has("selection"));
+    mark();
+    sim();
+  }
 
   // ---- following the reader ----
   function follow() {
@@ -570,8 +624,7 @@
   };
   const onMessage = (msg, _sender, reply) => {
     if (msg.type === "neurochat:signal") { signal({ ...msg.signal, source: msg.signal?.source || "muse" }); return; }
-    if (msg.type === "neurochat:term-defs") { defs = { ...defs, ...msg.defs }; for (const s of document.querySelectorAll("span.neurochat-term")) s.title = defs[s.textContent.toLowerCase()] || s.title; return; }
-    if (msg.type === "neurochat:plainer") { const p = paras.find((q) => q.key === msg.key) || paras[at]; if (p) plainer(p); reply({ ok: !!p }); return; }
+    if (msg.type === "neurochat:plainer") { const p = paras.find((q) => q.key === msg.key); if (p) plainer(p); reply({ ok: !!p }); return; }
   };
   chrome.runtime.onMessage.addListener(onMessage);
 
@@ -585,6 +638,10 @@
     if (!paras.length) { say("No paragraphs to study on this page"); return; }
     on = true;
     session = { start: Date.now(), signals: [], blinks: [], extraMs: 0 };
+    // What a paragraph went through last session (on this page, without a reload) doesn't carry over.
+    for (const p of paras) Object.assign(p, { clock: new P.Clock(), visits: 0, rereads: 0, slow: false, slowAt: 0, first: undefined, last: undefined,
+      acted: false, judged: false, explained: false, checked: false, frozen: undefined, termed: false });
+    notice = null;
     clearTimeout(note);
     style = document.createElement("style");
     style.textContent = `
@@ -594,9 +651,10 @@
       html.neurochat-study .neurochat-current.neurochat-slow.neurochat-stuck { box-shadow: -12px 0 0 -9px rgba(229, 138, 0, 1) !important; }
       html.neurochat-study .neurochat-plain { box-shadow: -12px 0 0 -10px rgba(11, 13, 18, .35); }
       html.neurochat-study .neurochat-plain.neurochat-slow { box-shadow: -12px 0 0 -9px rgba(229, 138, 0, .45) !important; }
-      html.neurochat-study .neurochat-term { text-decoration: underline dotted rgba(229, 138, 0, .9) 1.5px; text-underline-offset: 3px; cursor: help; }`;
+      html.neurochat-study .neurochat-term { text-decoration: underline dotted rgba(11, 13, 18, .45) 1.5px; text-underline-offset: 3px; cursor: help; }`;
     document.documentElement.append(style, host);
     document.documentElement.classList.add("neurochat-study");
+    document.documentElement.toggleAttribute("data-neurochat-selection", has("selection")); // content.js leaves those selections to us
     paras.forEach((p) => p.el.classList.add("neurochat-dim"));
     // Capture: also hears pages whose text scrolls inside a panel rather than the window.
     addEventListener("scroll", onScroll, { capture: true, passive: true });
@@ -610,7 +668,8 @@
     watcher.observe(document.body, { childList: true, subtree: true, characterData: true });
     ticker = setInterval(() => { if (at >= 0) mark(); if (++ticks % 30 === 0) tired(); }, 1000);
     keyTerms = has("terms") ? M.keyTerms(paras.map((p) => p.text)) : [];
-    if (keyTerms.length) chrome.runtime.sendMessage({ type: "neurochat:terms", terms: keyTerms, url: location.href, title: document.title }).catch(() => {});
+    defs = {};
+    if (keyTerms.length) define(keyTerms);
     sim();
     follow();
   }
@@ -631,8 +690,10 @@
     document.removeEventListener("visibilitychange", onVisibility);
     removeEventListener("pagehide", onHide);
     unplain();
+    ports.forEach((port) => port.close());
     unterm();
     document.documentElement.classList.remove("neurochat-study");
+    document.documentElement.removeAttribute("data-neurochat-selection");
     paras.forEach((p) => p.el.classList.remove("neurochat-dim", "neurochat-current", "neurochat-slow", "neurochat-stuck"));
     style?.remove();
     notice = null;

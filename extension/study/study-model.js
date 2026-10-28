@@ -128,40 +128,72 @@
 
   // ---- key terms: rare words the page leans on ----
   function keyTerms(texts, n = 3) {
-    const count = new Map(), shown = new Map();
-    for (const t of texts) for (const w of String(t).match(WORD) || []) {
-      const k = w.toLowerCase().replace(/['’]s$/, "");
+    const count = new Map(), lower = new Set();
+    const all = texts.flatMap((t) => String(t).match(WORD) || []);
+    const seen = new Set(all.map((w) => w.toLowerCase()));
+    for (const w of all) {
+      let k = w.toLowerCase().replace(/['’]s$/, "");
+      if (/s$/.test(k) && seen.has(k.slice(0, -1))) k = k.slice(0, -1); // "electrodes" counts as "electrode"
+      if (w[0] === w[0].toLowerCase()) lower.add(k);
       // Key terms are nearly always nouns: -ed, -ing and -ly words are left out.
       if (k.length < 7 || COMMON.has(k) || /\d/.test(k) || /(ed|ing|ly)$/.test(k)) continue;
       count.set(k, (count.get(k) || 0) + 1);
-      if (!shown.has(k)) shown.set(k, w.replace(/['’]s$/, ""));
     }
-    return [...count].filter(([, c]) => c >= 2)
+    // A word never written in lower case is a name (Gibbs, Tesla), not a term to define.
+    return [...count].filter(([k, c]) => c >= 2 && lower.has(k))
       .map(([k, c]) => [k, c * Math.log(k.length) * (1 + syllables(k) / 4)])
-      .sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => shown.get(k));
+      .sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
   }
 
   // ---- review questions come back after 1, 3, then 7 days ----
   const DAYS = [1, 3, 7];
   const DAY = 86400000;
-  // grade: "right" moves to the next gap (and finishes after the last), "partly" repeats the gap,
-  // "wrong" starts over.
+  // step = right answers in a row. Right: the next gap (1, then 3, then 7 days; learned after that).
+  // Partly: the same gap again. Wrong: back to 1 day.
   function schedule(item, grade, now = Date.now()) {
     let step = item.step || 0;
     if (grade === "right") step++;
     else if (grade === "wrong") step = 0;
-    if (step >= DAYS.length) return { ...item, step, due: null, last: grade };
-    return { ...item, step, due: now + DAYS[step] * DAY, last: grade };
+    if (step > DAYS.length) return { ...item, step, due: null, last: grade };
+    return { ...item, step, due: now + DAYS[Math.max(0, step - 1)] * DAY, last: grade };
   }
-  const parseGrade = (text) => { const m = /^[\s*_#>"“]*(right|partly|wrong)\b/i.exec(String(text)); return m ? m[1].toLowerCase() : null; };
+  // The mark at the start of the tutor's reply; anything it can't read counts as "partly".
+  function parseGrade(text) {
+    const m = /\b(right|correct|partly|partially|partial|wrong|incorrect|not quite)\b/i.exec(String(text).slice(0, 60));
+    if (!m) return "partly";
+    return { right: "right", correct: "right", wrong: "wrong", incorrect: "wrong" }[m[1].toLowerCase()] || "partly";
+  }
+  // "term: definition" lines (with or without bold, bullets or numbers) for the terms asked about.
+  function parseDefs(text, terms) {
+    const want = new Set(terms.map((t) => t.toLowerCase())), out = {};
+    for (const line of String(text).split("\n")) {
+      const d = /^\s*(?:[-*•]|\d+[.)])?\s*\**\s*([^:*]+?)\s*\**\s*:\s*\**\s*(.+)$/.exec(line);
+      if (d && want.has(d[1].toLowerCase())) out[d[1].toLowerCase()] = d[2].replace(/\*\*/g, "").trim();
+    }
+    return out;
+  }
+
+  // A small model still wraps answers sometimes ("Here's a simpler version:" … "Does that help?").
+  function bare(text) {
+    const lines = String(text).trim().split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length > 1 && /:$/.test(lines[0])) lines.shift();
+    let t = lines.join(" ").replace(/^["“]+|["”]+$/g, "");
+    const cut = t.replace(/\s*[^.!?]*\?\s*$/, "");
+    if (cut.length > t.length * 0.5) t = cut; // a trailing question, unless that's most of it
+    return t.trim();
+  }
 
   // ---- the session as a CSV, one row per paragraph ----
   function toCSV(rows) {
     if (!rows.length) return "";
     const cols = Object.keys(rows[0]);
-    const cell = (v) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const cell = (v) => {
+      let s = v === null || v === undefined ? "" : String(v);
+      if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`; // page text must not run as a spreadsheet formula
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
     return [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\n") + "\n";
   }
 
-  return { COMMON, W0, FIT_AFTER, RATIO, FATIGUE, DAYS, features, fit, predict, tune, fatigue, keyTerms, schedule, parseGrade, toCSV };
+  return { COMMON, W0, FIT_AFTER, RATIO, FATIGUE, DAYS, features, fit, predict, tune, fatigue, keyTerms, schedule, parseGrade, parseDefs, bare, toCSV };
 });

@@ -197,7 +197,7 @@ async function ask(text, shownText = text, meta) {
       content = `I'm reading "${page.title}". Here is the page:\n\n"""${page.text.slice(0, PAGE_CHARS)}"""\n\n${text}`;
     }
   }
-  send({ type: "ask", text: content }, content, { text: shownText }, meta);
+  send({ type: "ask", text: content, ...(meta?.task ? { task: true } : {}) }, content, { text: shownText }, meta);
 }
 
 // Explain a selection or a paragraph. On a page that already has a conversation it carries on there.
@@ -218,9 +218,12 @@ async function explain(req) {
   const earlier = Array.isArray(req.earlier) ? req.earlier.slice(0, 3) : [];
   if (earlier.length) msg.earlier = earlier.map((e) => e.text);
   // What the companion builds from this; kept here so the conversation can be restored later.
-  const content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
-    (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "") +
-    (earlier.length ? `\n\nEarlier in the same section I also slowed down on these. If my trouble starts there, say so and explain that first:\n\n${earlier.map((e) => `"""${e.text}"""`).join("\n\n")}` : "");
+  let content = `I got stuck on this part${req.title ? ` in a text titled "${req.title}"` : ""}. Can you explain it differently?\n\n"""${req.text}"""` +
+    (req.context && req.context.trim() !== req.text.trim() ? `\n\nIt's from this paragraph:\n\n"""${req.context}"""` : "");
+  if (earlier.length) {
+    content = `Earlier in the same section I also slowed down on:\n\n${earlier.map((e, i) => `(earlier ${i + 1}) """${e.text}"""`).join("\n\n")}\n\n${content}` +
+      "\n\nExplain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.";
+  }
   send(msg, content, { quote: req.text, text: "Explain this", also: earlier.map((e) => e.index) }, req.key ? { ...req, study: "explain" } : undefined);
 }
 

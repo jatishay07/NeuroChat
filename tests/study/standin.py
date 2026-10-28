@@ -26,12 +26,12 @@ DEFS = {"electrons": "tiny charged particles; their flow through a wire is elect
 
 
 def answer(prompt: str) -> str:
-    if "Rewrite the paragraph below in plain language" in prompt:
+    if "Rewrite the paragraph below in plain" in prompt:
         return PLAIN
     if "Define each of these terms" in prompt:
         terms = [t.strip() for t in prompt.rsplit("Terms:", 1)[-1].split(",")]
         return "\n".join(f"**{t}**: {DEFS.get(t.lower(), 'a key term in this text.')}" for t in terms)
-    if "Ask me one short question" in prompt:
+    if "Ask me one short" in prompt:
         return QUESTION
     if "Mark my answer" in prompt:
         return GRADE

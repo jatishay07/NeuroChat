@@ -146,7 +146,7 @@ def test_study_mode_features_in_the_extension():
         url = f"http://127.0.0.1:{httpd.server_address[1]}/article.html"
         r = subprocess.run([NODE, "tests/study/features.mjs", url], cwd=ROOT, capture_output=True, text=True,
                            timeout=240, env={**os.environ, "NODE_PATH": _node_path()})
-        assert r.returncode == 0, r.stdout + r.stderr
+        assert r.returncode == 0, r.stdout + r.stderr + "\n".join(repr(c["messages"][-1]["content"][:120]) for c in standin.chats)
         assert json.loads(r.stdout.strip().splitlines()[-1])["ok"]
     finally:
         httpd.shutdown()
@@ -154,8 +154,8 @@ def test_study_mode_features_in_the_extension():
         thread.join(timeout=5)
     prompts = [c["messages"][-1]["content"] for c in standin.chats]
     # Look-back reached the tutor; the plainer rewrite and the definitions went as one-off questions.
-    assert any("Earlier in the same section I also slowed down on these" in p for p in prompts)
-    assert any(p.startswith("Rewrite the paragraph below in plain language") for p in prompts)
+    assert any(p.startswith("Earlier in the same section I also slowed down on:") for p in prompts)
+    assert any(p.startswith("Rewrite the paragraph below in plain words") for p in prompts)
     assert any("Define each of these terms" in p for p in prompts)
     assert any("Mark my answer" in p for p in prompts)
 
@@ -164,7 +164,8 @@ def test_look_back_paragraphs_reach_the_tutor():
     from companion.tutor import explain_request
 
     text = explain_request("Para three.", "T", earlier=["Para one."])
-    assert text.endswith('"""Para one."""') and "Earlier in the same section" in text
+    assert text.startswith('Earlier in the same section I also slowed down on:\n\n(earlier 1) """Para one."""')
+    assert text.endswith("Explain the one I'm stuck on now. If one of the earlier ones is the real gap, say so in one sentence first.")
     assert "Earlier" not in explain_request("Para three.", "T")
     ollama = fake_ollama()
     with TestClient(create_app(SimulatedBackend(), Tutor(transport=ollama))) as client, client.websocket_connect("/ws/chat") as ws:

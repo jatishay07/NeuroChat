@@ -79,7 +79,7 @@
     setTimeout(() => {
       const sel = selection();
       // In study mode a selection in the lit paragraph gets study mode's own "Explain selection".
-      const lit = document.documentElement.classList.contains("neurochat-study") && window.getSelection().anchorNode?.parentElement?.closest(".neurochat-current");
+      const lit = document.documentElement.hasAttribute("data-neurochat-selection") && window.getSelection().anchorNode?.parentElement?.closest(".neurochat-current");
       sel && !lit ? showFor(sel) : hide();
     }, 0);
   });

@@ -20,7 +20,7 @@ from .device import Backend, BackendError, BrowserHeadset, DeviceManager
 from .engagement import CalibrationError, LiveEngagement
 from .gaze import GazeSession, visit_json
 from .session_record import record_router
-from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request, reader_notes
+from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, TASK_PROMPT, Tutor, TutorError, explain_request, reader_notes
 from .webui import WebUI, WebUIError
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
@@ -225,7 +225,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         (or a selected passage, with the paragraph around it as optional context), optionally with what
         the reading page measured: "index", "dwellMsPer100Words", "medianMsPer100Words", "rereads", and
         "earlier" (study mode's look-back: up to 3 earlier paragraphs that also slowed the reader); or
-        {"type": "ask", "text": ...} for a follow-up. Replies stream back as
+        {"type": "ask", "text": ...} for a follow-up ("task": true answers it bare, for study mode's one-off
+        tasks). Replies stream back as
         {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
         or {"type": "error", "message": ...}.
         {"type": "continue"} copies the conversation into Open WebUI and answers
@@ -279,6 +280,8 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                         base = CHAT_PROMPT
                         passage = None
                     system = base + signals_for(passage, follow_up=True)
+                    if msg.get("task") is True:  # study mode's one-off tasks want the bare answer
+                        system = TASK_PROMPT
                     history.append({"role": "user", "content": msg["text"].strip()})
                 else:
                     await ws.send_json({"type": "error", "message": "Unknown message."})

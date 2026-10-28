@@ -70,8 +70,8 @@ try {
   s = await state();
   assert.equal(s.at, 2);
   assert.equal(s.slow[2], false, "the dense paragraph at the same speed is not");
-  // 7. Self-tuning: ¶1 was flagged and left with nothing done about it, so the bar rose a step.
-  assert.equal(s.ratio, 1.55);
+  // 7. Self-tuning: leaving just after a flag doesn't count as a needless flag (that's a slow reader finishing).
+  assert.equal(s.ratio, 1.5);
   seen.tune = s.ratio;
 
   // 3. Rereads: back to ¶2 and staying 2 s counts; a quick k-then-j doesn't.
@@ -150,6 +150,7 @@ try {
 
   // 8. Plainer: p rewrites ¶3 in place; p again shows the original, exactly as it was.
   const before = await page.evaluate(() => document.querySelectorAll("article p")[3].innerHTML);
+  assert.equal((await state()).alt, null, "no Plainer button on a paragraph that isn't slow");
   await page.keyboard.press("p");
   await page.waitForFunction(() => /^A battery only charges/.test(document.querySelectorAll("article p")[3].textContent) && document.querySelector("neurochat-study"), null, { timeout: 10000 });
   for (let k = 0; k < 30 && (await state()).alt !== "Original"; k++) await page.waitForTimeout(100);
@@ -163,25 +164,29 @@ try {
   // 9. Check-back: leaving the section you struggled in offers one question; the tutor marks the answer.
   await page.keyboard.press("j"); await page.waitForTimeout(800);
   s = await state();
-  assert.match(s.offer, /^One question on ¶[123]\?$/);
+  assert.equal(s.offer, "Quick check on what you just read?");
   await state({ press: "offer" });
   await panel.locator(".turn-tutor .answer", { hasText: "What has to be true" }).waitFor({ timeout: 10000 });
-  await panel.waitForTimeout(300);
+  await panel.waitForFunction(() => document.getElementById("askInput").placeholder === "Your answer, in your own words");
   await panel.locator("#askInput").fill("The charger has to push harder than the battery's own voltage.");
   await panel.locator("#askInput").press("Enter");
-  await panel.locator(".noted", { hasText: "Asking again in 3 days" }).waitFor({ timeout: 10000 });
+  await panel.locator(".noted", { hasText: "Asking again in 1 day" }).waitFor({ timeout: 10000 });
+  assert.equal(await panel.locator("#askInput").getAttribute("placeholder"), "Ask about this page");
   const review = Object.entries(await local()).filter(([k]) => k.startsWith("neurochat.study.r:"));
   assert.equal(review.length, 1);
   assert.equal(review[0][1].step, 1);
   assert.equal(review[0][1].last, "right");
-  seen.checkback = "question, answer marked RIGHT, due in 3 days";
+  seen.checkback = "question, answer marked RIGHT, due in 1 day";
 
   // 12. Before you read: the key terms, defined on opening; the page's underlined term gets the definition.
   await panel.locator("#terms summary", { hasText: "electrons, lithium, graphite" }).waitFor({ timeout: 5000 });
   await panel.locator("#terms summary").click();
   await panel.locator("#defs", { hasText: "pencil lead" }).waitFor({ timeout: 10000 });
-  await page.waitForFunction(() => /charged particles/.test(document.querySelector("span.neurochat-term")?.title || ""), null, { timeout: 5000 });
+  assert.match(await page.evaluate(() => document.querySelector("span.neurochat-term").title), /charged particles/);
   seen.terms = "listed, defined, and the underline shows the definition";
+
+  // Read on to the end, so the session has enough for a review.
+  for (let k = 0; k < 4; k++) { await page.keyboard.press("j"); await page.waitForTimeout(1800); }
 
   // 10. Session review at Exit: a card with what was hard, and the session as a CSV.
   await page.keyboard.press("Escape");

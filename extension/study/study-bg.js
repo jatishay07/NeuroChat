@@ -2,7 +2,8 @@
 // - One-off questions to the tutor that aren't part of the side chat's conversation (a plainer
 //   rewrite of a paragraph, definitions of key terms): a port named "neurochat:oneshot" sends
 //   {prompt}, gets {type: "token", text}... then {type: "done"} or {type: "error", message}.
-// - Key terms a page in study mode found, kept per tab for the side chat ("terms:<tabId>").
+// - Key terms a page in study mode found, and their definitions once the tutor has given them, kept
+//   per tab for the side chat ("terms:<tabId>").
 // - "One question on ¶4?" from the page opens the side chat on a check-back question.
 const STUDY_COMPANION = "ws://127.0.0.1:8765/ws/chat";
 
@@ -12,7 +13,7 @@ function oneshot(prompt, emit) {
   let ended = false;
   const end = (m) => { if (ended) return; ended = true; emit(m); try { ws.close(); } catch { /* already closed */ } };
   // A fresh socket has no history, so the companion answers it as a plain chat, not the page's conversation.
-  ws.onopen = () => ws.send(JSON.stringify({ type: "ask", text: prompt }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: "ask", text: prompt, task: true }));
   ws.onmessage = (ev) => {
     const e = JSON.parse(ev.data);
     if (e.type === "token") emit(e);
@@ -35,7 +36,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === "neurochat:terms" && sender.tab) {
-    chrome.storage.session.set({ [`terms:${sender.tab.id}`]: { terms: msg.terms.slice(0, 5), url: msg.url, title: msg.title } });
+    chrome.storage.session.set({ [`terms:${sender.tab.id}`]: { terms: msg.terms.slice(0, 5), url: msg.url, title: msg.title, defs: msg.defs || null } });
     return;
   }
   if (msg.type === "neurochat:check" && sender.tab) {
