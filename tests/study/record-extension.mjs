@@ -15,9 +15,9 @@ const ext = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../ex
 const H = 760;
 
 const context = await chromium.launchPersistentContext("", {
-  channel: "chromium", headless: true, viewport: { width: 960, height: H },
+  headless: false, viewport: { width: 960, height: H },
   recordVideo: { dir: out, size: { width: 960, height: H } },
-  args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
+  args: ["--headless=new", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
 });
 const sw = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
 const id = new URL(sw.url()).host;

@@ -1,5 +1,6 @@
 // Playwright check of study mode inside the Chrome extension, on a made-up news page.
 // tests/test_study.py serves tests/study/fixtures/ and runs: node tests/study/extension.mjs <article-url>
+// Chromium's own --headless=new (not Playwright's headless shell) because only it loads extensions.
 // Real time (content scripts run in their own world, which Playwright's fake clock doesn't reach),
 // so the baseline is seeded fast and a few seconds on a paragraph counts as slow.
 import { createRequire } from "node:module";
@@ -13,8 +14,8 @@ const [url] = process.argv.slice(2);
 const ext = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../extension");
 
 const context = await chromium.launchPersistentContext("", {
-  channel: "chromium", headless: true, viewport: { width: 1280, height: 800 },
-  args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
+  headless: false, viewport: { width: 1280, height: 800 },
+  args: ["--headless=new", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
 });
 const seen = {};
 try {
