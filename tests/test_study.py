@@ -32,7 +32,11 @@ def test_study_page_is_served_and_linked_from_home():
     with TestClient(create_app(SimulatedBackend())) as client:
         page = client.get("/study.html")
         assert page.status_code == 200 and "Study mode" in page.text
-        for asset in ("study/study.js", "study/study-pace.js", "study/study.css"):
+        for asset in (
+            "study/study.js",
+            "study/study-pace.js",
+            "study/study.css",
+        ):
             assert f'"{asset}"' in page.text
             assert client.get(f"/{asset}").status_code == 200
         assert 'href="/study.html"' in client.get("/").text
