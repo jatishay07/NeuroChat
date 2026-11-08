@@ -351,8 +351,9 @@ def create_app(
         "context": ...} to start on a paragraph (or a selected passage, with the
         paragraph around it as optional context), optionally with what the
         reading page measured: "index", "dwellMsPer100Words",
-        "medianMsPer100Words", "rereads"; or {"type": "ask", "text": ...} for a
-        follow-up. Replies stream back as {"type": "start"}, then {"type":
+        "medianMsPer100Words", "rereads", and "earlier" (study mode's look-back:
+        up to 3 earlier paragraphs that also slowed the reader); or
+        {"type": "ask", "text": ...} for a follow-up. Replies stream back as {"type": "start"}, then {"type":
         "token", "text": ...}..., then {"type": "done"}, or {"type": "error",
         "message": ...}. {"type": "continue"} copies the conversation into Open
         WebUI and answers {"type": "continued", "url": ...} (or an error), so it
@@ -414,6 +415,17 @@ def create_app(
                         msg  # an appended passage brings its own numbers too
                     )
                     system = base + signals_for(passage)
+                    # Study mode's look-back: a few earlier paragraphs, kept short for a small model.
+                    earlier = msg.get("earlier")
+                    earlier = (
+                        [
+                            e[:600]
+                            for e in earlier
+                            if isinstance(e, str) and e.strip()
+                        ][:3]
+                        if isinstance(earlier, list)
+                        else []
+                    )
                     history.append(
                         {
                             "role": "user",
@@ -424,6 +436,7 @@ def create_app(
                                 msg.get("rereads")
                                 if isinstance(msg.get("rereads"), int)
                                 else None,
+                                earlier or None,
                             ),
                         }
                     )
