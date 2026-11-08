@@ -25,3 +25,10 @@ Newest last. Mark handled messages `[done]`.
   interim files (start.sh, docker/entrypoint.sh, portal/*). It conflicts with #42 only in formatting:
   either order works, the second one takes its own side and runs scripts/format.sh. .graph/ and
   CLAUDE.md are deliberately not reformatted.
+- REQUEST 2026-11-08 from style: S-2 code layout PR (draft until #42 merges, Atishay picked that order). Please update the owns column in THREADS.md and file paths in CONTRACTS.md when you merge it.
+  Python: companion/ → src/neurochat/ (`python -m neurochat`): app.py, __main__.py, device/ (same files);
+  signals/ = engagement, eyemove, gaze, recording, synthetic; chat/ = tutor, webui;
+  research/ = e2e, eyedata, realdata, session_record. Imports are absolute (`from neurochat.signals.engagement import …`).
+  Portal: page URLs unchanged; scripts/styles move next to their page: study/, eyes/, record/, chat/,
+  connect/ (index.html: app.js, bluetooth.js), shared/ (style.css, reader.css, reader-ui.js, tutor.js, tutor.css).
+  After it merges: merge main; git follows the renames, so your edits normally land in the moved files.
