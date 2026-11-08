@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pathlib import Path
 import time
 
@@ -227,31 +228,56 @@ class RecordingBackend:
         return self.data[:, idx]
 
 
+# --replay bird: which of subject A's minutes to play for each band. Scored with
+# the calibration below, the second neutral minute reads low most of the time,
+# the second concentrating minute moderate (wobbling into high), and the first
+# concentrating minute high throughout. The "relaxed" minutes (eyes closed,
+# calm music) are left out: this index reads them as the most engaged of all.
+BIRD_PARTS = {
+    "low": "neutral-2",
+    "moderate": "concentrating-2",
+    "high": "concentrating-1",
+}
+
+
 def replay_backend(spec: str) -> RecordingBackend:
-    """--replay: "bird" plays one person from the public Bird et al. Muse set
-    (relaxed, then neutral, then concentrating; downloaded into data/bird the
-    first time), anything else is a list of recording files separated by
-    commas.
+    """--replay: "bird" plays one person from the public Bird et al. Muse set,
+    a minute that reads low, then one that reads moderate, then one that reads
+    high (downloaded into data/bird the first time); "bird:low",
+    "bird:moderate" or "bird:high" loops just that minute. Anything else is a
+    list of recording files separated by commas.
     """
-    if spec == "bird":
+    if spec == "bird" or spec.startswith("bird:"):
         from .engagement import calibration_bound
         from .realdata import fetch
 
-        folder = Path("data/bird")
-        fetch(folder)
-        # Calibrated the paper's way on the same person's other session, which isn't played.
-        neutral, focused = (
-            load_recording(folder / f"subjecta-{s}-2.csv")
-            for s in ("neutral", "concentrating")
+        bands = (
+            spec[5:].split(",")
+            if spec.startswith("bird:")
+            else list(BIRD_PARTS)
         )
+        unknown = [b for b in bands if b not in BIRD_PARTS]
+        if unknown:
+            raise ValueError(
+                f"--replay bird:{','.join(unknown)}: choose from "
+                + ", ".join(BIRD_PARTS)
+            )
+        folder = Path(os.environ.get("NEUROCHAT_BIRD_DATA", "data/bird"))
+        fetch(folder)  # skips files already there
         backend = RecordingBackend(
             [
                 (
-                    f"Bird et al. subject A, {state}",
-                    load_recording(folder / f"subjecta-{state}-1.csv"),
+                    f"Bird et al. subject A, {BIRD_PARTS[b].split('-')[0]} (reads {b})",
+                    load_recording(folder / f"subjecta-{BIRD_PARTS[b]}.csv"),
                 )
-                for state in ("relaxed", "neutral", "concentrating")
+                for b in bands
             ]
+        )
+        # Calibrated the paper's way: E_min over the person's neutral minute,
+        # E_max over a concentrating one.
+        neutral, focused = (
+            load_recording(folder / f"subjecta-{s}-2.csv")
+            for s in ("neutral", "concentrating")
         )
         backend.calibration = (
             calibration_bound(neutral.eeg, neutral.srate, "relax"),

@@ -40,3 +40,41 @@ def test_concentrating_reads_more_engaged_than_neutral_on_real_eeg():
             s,
             held,
         )
+
+
+def test_replay_bird_plays_a_low_a_moderate_and_a_high_minute():
+    """--replay bird: scored with its own calibration, the three minutes read
+    mostly low, then mostly moderate, then high, in that order, and bird:BAND
+    picks one of them.
+    """
+    from collections import Counter
+
+    from companion.engagement import bucket_for
+    from companion.engagement import Calibration
+    from companion.engagement import engagement_series
+    from companion.recording import BIRD_PARTS
+    from companion.recording import replay_backend
+
+    backend = replay_backend("bird")
+    cal = Calibration(*backend.calibration)
+    assert [
+        label.split("(reads ")[1][:-1] for _, _, label in backend.parts
+    ] == [
+        "low",
+        "moderate",
+        "high",
+    ]
+    for (start, end, label), band in zip(
+        backend.parts, BIRD_PARTS, strict=True
+    ):
+        values = engagement_series(backend.data[:, start:end], backend.srate)[1]
+        values = values[np.isfinite(values)]
+        buckets = Counter(bucket_for(cal.normalize(v)).name for v in values)
+        assert buckets.most_common(1)[0][0] == band, (label, buckets)
+    one = replay_backend("bird:moderate")
+    assert (
+        len(one.parts) == 1
+        and "concentrating (reads moderate)" in one.parts[0][2]
+    )
+    with pytest.raises(ValueError, match="choose from"):
+        replay_backend("bird:medium")

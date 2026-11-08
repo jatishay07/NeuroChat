@@ -6,16 +6,20 @@ Owned by the `engagement` thread; only it edits this file.
 
 - **project thread:** Turn engagement scores into prompts
 - **node:** Reviewer → Integrator
-- **task:** T11 signals page in the extension (sample data only); T9 next
+- **task:** T11b `--replay bird` covers all three bands (PR #48 merged; follow-up); T9 next
 - **status:** active (confirmed 2026-10-27)
 - **owns:** companion/engagement.py, synthetic.py, recording.py, realdata.py, e2e.py, extension/signals/, /api/engagement/* in companion/app.py, tests/test_engagement.py, test_e2e.py, test_realdata.py, test_signals.py, tests/signals/
 - **needs from others:** Atishay: ~10 min labelled Athena data (T9)
-- **has for others:** engagement API (incl. /api/engagement/signals and /prompt), SimulatedBackend(engagement=), RecordingBackend / `--replay bird|FILES`
+- **has for others:** engagement API (incl. /api/engagement/signals and /prompt), SimulatedBackend(engagement=), RecordingBackend / `--replay bird[:low|moderate|high]|FILES`
 
 ## State
 
 Current node, last handoff line, retry counters (Tester n/3, Reviewer n/2), open questions.
 
+- 2026-11-08 T11b (Atishay: the replay only ever showed high): scored every Bird minute against the replay
+  calibration. Relaxed (eyes closed, music) reads highest of all with β/(α+θ); neutral reads low, concentrating-2
+  moderate, concentrating-1 high. `[Builder] --replay bird plays low → moderate → high minutes, bird:BAND loops one
+  → [Tester] band-order test on the real files, 89 passed → [Reviewer] ok → PR`. PR #48 merged earlier that day.
 - 2026-11-08 T11 (Atishay: show the α/β waves and the system prompt in the extension, sample data only):
   `[Builder] signals page + /api/engagement/signals,/prompt + --replay → [Tester] 88 passed, Playwright page check + video → [Reviewer] ok → PR`.
   Touched outside my files: extension/sidepanel.html/.js/.css (one header button; side-chat told), companion/__main__.py (--replay flag; graph told), companion/app.py (/api/engagement/* and app.state.last_prompt set in /ws/chat; side-chat told).

@@ -148,6 +148,7 @@ async function checkStatus() {
   try {
     const s = await (await fetch(`http://${COMPANION}/api/tutor`)).json();
     setStatus(s.ready ? '' : s.error, !s.ready);
+    checkSignals();
   } catch {
     setStatus(
       "NeuroChat isn't running. Open a terminal and type: neurochat",
@@ -412,5 +413,17 @@ $('newBtn').onclick = async () => {
 })();
 
 // The signals page: the waves the headset recorded and the prompt the tutor got.
+// Its button shows only while EEG is streaming (a headset, or recordings being
+// replayed), so readers without one never see it.
+async function checkSignals() {
+  try {
+    const d = await (
+      await fetch(`http://${COMPANION}/api/engagement/signals?seconds=10`)
+    ).json();
+    $('signalsBtn').hidden = d.state !== 'streaming';
+  } catch {
+    $('signalsBtn').hidden = true;
+  }
+}
 $('signalsBtn').onclick = () =>
   chrome.tabs.create({url: chrome.runtime.getURL('signals/signals.html')});

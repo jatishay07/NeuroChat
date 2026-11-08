@@ -1,5 +1,5 @@
 """Run the companion app: python -m companion [--simulate [--engagement
-LEVEL|demo] | --replay bird|FILE] [--port 8765] [--host 127.0.0.1].
+LEVEL|demo] | --replay bird[:BAND]|FILE] [--port 8765] [--host 127.0.0.1].
 """
 
 from __future__ import annotations
@@ -44,9 +44,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--replay",
-        metavar="bird|FILE[,FILE...]",
+        metavar="bird[:low|moderate|high]|FILE[,FILE...]",
         help="play recorded EEG as if a headset were streaming it: 'bird' for public Muse "
-        "recordings (downloaded the first time), or your own CSV/NPZ/XDF files",
+        "recordings (downloaded the first time) that read low, then moderate, then high, 'bird:low' (or moderate, high) to stay on one band, or your own CSV/NPZ/XDF files",
     )
     parser.add_argument("--port", type=int, default=8765)
     # Only this computer can reach the portal by default. Docker sets 0.0.0.0 so

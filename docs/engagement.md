@@ -48,8 +48,14 @@ python -m companion --replay bird                 # public Muse recordings (Bird
 python -m companion --replay my-calm.csv,my-focus.csv   # your own Mind Monitor / muselsl / NPZ / XDF files
 ```
 
-`--replay bird` plays one person's relaxed, neutral and concentrating minutes in a loop, calibrated
-on that person's other session. The simulated headset's noise is drawn too, but the page says it never
+`--replay bird` plays three of one person's minutes in a loop: one that scores low (neutral), one that
+scores moderate (concentrating, second session; it wobbles into high), one that scores high
+(concentrating, first session), calibrated the paper's way on the neutral and concentrating minutes.
+The device name on the signals page says which is playing. `--replay bird:low`, `bird:moderate` or
+`bird:high` stays on one band, to test what the tutor is told at that level. The set's "relaxed"
+minutes (eyes closed, calm music) are not played: this index reads them as more engaged than
+concentrating, which is one of the things the headset study has to settle. The files go in `data/bird`
+(or `NEUROCHAT_BIRD_DATA`). The simulated headset's noise is drawn too, but the page says it never
 reaches the tutor.
 
 `python -m companion.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four

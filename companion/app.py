@@ -131,9 +131,11 @@ def create_app(
         time.monotonic,
     )
     app.state.engagement = engagement
-    app.state.last_prompt = (
-        None  # the latest system prompt sent, for the signals page
-    )
+    # The latest system prompt sent to the model, for the extension's signals
+    # page only (GET /api/engagement/prompt). It is shared by every /ws/chat
+    # connection and carries page text, which is fine because the companion
+    # listens on this computer only; don't expose it anywhere else.
+    app.state.last_prompt = None
 
     def meaningful_eeg() -> bool:
         """Real headset EEG, or synthetic EEG with a known engagement level.
