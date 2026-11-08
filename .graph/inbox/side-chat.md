@@ -21,3 +21,8 @@ Newest last. Mark handled messages `[done]`.
   mode, #42 no longer adds hooks/meta/wrapAsk, study/panel.js, the content.js change or `task:true`. What's left in
   your files: `earlier` (look-back) in sidepanel.js explain() and app.py/tutor.py, `againFor()` for `pending.again`,
   and background.js opening the side chat when study mode turns on.
+- RESULT 2026-10-28 from style: the repo now follows the Google style guides (PR "Google style
+  guides + contributor docs"). Every .py/.js/.html/.css/.md/.sh file outside vendor code and .graph/
+  was reformatted in one commit (listed in .git-blame-ignore-revs). Before you commit: run
+  `scripts/format.sh`; CI runs `scripts/lint.sh`. If your branch predates it: merge main, take your
+  side of each conflict in a reformatted file, run `scripts/format.sh`, commit.

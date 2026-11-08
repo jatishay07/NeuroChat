@@ -13,3 +13,8 @@ node_modules/
 .webui-data/
 .webui_secret_key
 synthetic-eeg/
+# Other EEG formats, secrets and local config: never commit them.
+*.edf
+*.bdf
+.env
+.env.*

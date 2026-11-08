@@ -1,0 +1,12 @@
+# Keeps GitHub Actions and Python dependencies patched. Dependabot PRs get a read-only token,
+# like PRs from forks.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly

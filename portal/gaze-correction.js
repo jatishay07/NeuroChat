@@ -5,24 +5,28 @@
 // position and direction. It's trained on a few hundred samples from following a moving dot, and on
 // every click while reading.
 (function (root) {
-  const LAMBDA = 1e-2;         // ridge strength, on standardised features
-  const MAX_SAMPLES = 1500;    // pursuit samples plus the most recent clicks
-  const CLICK_WEIGHT = 8;      // a click is one exact sample against many noisy pursuit ones
+  const LAMBDA = 1e-2; // ridge strength, on standardised features
+  const MAX_SAMPLES = 1500; // pursuit samples plus the most recent clicks
+  const CLICK_WEIGHT = 8; // a click is one exact sample against many noisy pursuit ones
   // Smallest scale per feature when standardising. During calibration the head barely moves, so its
   // features' spread is tiny; dividing by that would turn a 5 cm shift later into a wild correction.
   const MIN_STD = [0.02, 0.02, 0.01, 0.01, 0.01, 3, 3, 3, 0.1, 0.1, 0.1]; // pog terms; origin cm; head vector
 
   function features(g) {
-    const [x, y] = g.pog, o = g.origin || [0, 0, 0], h = g.head || [0, 0, 0];
+    const [x, y] = g.pog,
+      o = g.origin || [0, 0, 0],
+      h = g.head || [0, 0, 0];
     return [x, y, x * x, y * y, x * y, o[0], o[1], o[2], h[0], h[1], h[2]];
   }
 
   // Solve (A + lambda I) b = c for symmetric A by Gaussian elimination with partial pivoting.
   function solve(A, c) {
-    const n = c.length, M = A.map((row, i) => [...row, c[i]]);
+    const n = c.length,
+      M = A.map((row, i) => [...row, c[i]]);
     for (let k = 0; k < n; k++) {
       let p = k;
-      for (let i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
+      for (let i = k + 1; i < n; i++)
+        if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
       [M[k], M[p]] = [M[p], M[k]];
       if (Math.abs(M[k][k]) < 1e-12) return null;
       for (let i = k + 1; i < n; i++) {
@@ -40,17 +44,19 @@
   }
 
   class GazeCorrection {
-    constructor() { this.clear(); }
+    constructor() {
+      this.clear();
+    }
 
     clear() {
-      this.samples = [];   // {f: features, t: [x, y] target, w: weight}
-      this.model = null;   // {mean, std, bx, by}
+      this.samples = []; // {f: features, t: [x, y] target, w: weight}
+      this.model = null; // {mean, std, bx, by}
     }
 
     // g: {pog: [x, y] from the tracker, origin: faceOrigin3D, head: headVector}; target: [x, y], both
     // in normalized screen coordinates.
     add(g, target, weight = 1) {
-      this.samples.push({ f: features(g), t: target, w: weight });
+      this.samples.push({f: features(g), t: target, w: weight});
       if (this.samples.length > MAX_SAMPLES) this.samples.shift();
     }
 
@@ -68,24 +74,34 @@
         const model = this._fit(used);
         if (!model) return null;
         this.model = model;
-        const res = used.map((s) => Math.hypot(...this._residual(s)));
-        const mad = [...res].sort((a, b) => a - b)[Math.floor(res.length / 2)] * 1.4826;
-        if (round === 0) used = used.filter((_, i) => res[i] <= 2.5 * mad + 1e-6);
+        const res = used.map(s => Math.hypot(...this._residual(s)));
+        const mad =
+          [...res].sort((a, b) => a - b)[Math.floor(res.length / 2)] * 1.4826;
+        if (round === 0)
+          used = used.filter((_, i) => res[i] <= 2.5 * mad + 1e-6);
         else return Math.sqrt(res.reduce((a, r) => a + r * r, 0) / res.length);
       }
     }
 
     _fit(samples) {
       const d = samples[0].f.length;
-      const mean = new Array(d).fill(0), std = new Array(d).fill(0);
+      const mean = new Array(d).fill(0),
+        std = new Array(d).fill(0);
       let W = 0;
-      for (const s of samples) { W += s.w; s.f.forEach((v, j) => (mean[j] += s.w * v)); }
+      for (const s of samples) {
+        W += s.w;
+        s.f.forEach((v, j) => (mean[j] += s.w * v));
+      }
       mean.forEach((_, j) => (mean[j] /= W));
-      for (const s of samples) s.f.forEach((v, j) => (std[j] += s.w * (v - mean[j]) ** 2));
-      std.forEach((_, j) => (std[j] = Math.max(Math.sqrt(std[j] / W), MIN_STD[j])));
+      for (const s of samples)
+        s.f.forEach((v, j) => (std[j] += s.w * (v - mean[j]) ** 2));
+      std.forEach(
+        (_, j) => (std[j] = Math.max(Math.sqrt(std[j] / W), MIN_STD[j]))
+      );
       const n = d + 1; // + intercept
-      const A = Array.from({ length: n }, () => new Array(n).fill(0));
-      const cx = new Array(n).fill(0), cy = new Array(n).fill(0);
+      const A = Array.from({length: n}, () => new Array(n).fill(0));
+      const cx = new Array(n).fill(0),
+        cy = new Array(n).fill(0);
       for (const s of samples) {
         const z = [1, ...s.f.map((v, j) => (v - mean[j]) / std[j])];
         for (let i = 0; i < n; i++) {
@@ -95,14 +111,18 @@
         }
       }
       for (let i = 1; i < n; i++) A[i][i] += LAMBDA * W; // don't shrink the intercept
-      const bx = solve(A, cx), by = solve(A, cy);
-      return bx && by ? { mean, std, bx, by } : null;
+      const bx = solve(A, cx),
+        by = solve(A, cy);
+      return bx && by ? {mean, std, bx, by} : null;
     }
 
     _predict(f) {
-      const { mean, std, bx, by } = this.model;
+      const {mean, std, bx, by} = this.model;
       const z = [1, ...f.map((v, j) => (v - mean[j]) / std[j])];
-      return [z.reduce((a, v, i) => a + v * bx[i], 0), z.reduce((a, v, i) => a + v * by[i], 0)];
+      return [
+        z.reduce((a, v, i) => a + v * bx[i], 0),
+        z.reduce((a, v, i) => a + v * by[i], 0),
+      ];
     }
 
     _residual(s) {
@@ -114,10 +134,13 @@
     apply(g) {
       if (!this.model) return g.pog;
       const p = this._predict(features(g));
-      return [Math.max(-0.6, Math.min(0.6, p[0])), Math.max(-0.6, Math.min(0.6, p[1]))];
+      return [
+        Math.max(-0.6, Math.min(0.6, p[0])),
+        Math.max(-0.6, Math.min(0.6, p[1])),
+      ];
     }
   }
 
   root.GazeCorrection = GazeCorrection;
-  if (typeof module !== "undefined") module.exports = { GazeCorrection };
-})(typeof window !== "undefined" ? window : globalThis);
+  if (typeof module !== 'undefined') module.exports = {GazeCorrection};
+})(typeof window !== 'undefined' ? window : globalThis);

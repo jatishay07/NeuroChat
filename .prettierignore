@@ -1,0 +1,11 @@
+# Third-party code and model files: kept byte for byte as upstream ships them.
+portal/vendor/
+portal/web/
+# Shared working notes, edited by many threads at once; formatting them would conflict.
+.graph/
+CLAUDE.md
+# Page snapshots the tests read as they are.
+tests/fixtures/
+tests/study/fixtures/
+node_modules/
+.venv/

@@ -1,49 +1,80 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NeuroChat · Connect your headset</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header class="top">
-    <span class="brand">NeuroChat</span>
-    <span class="steps" role="img" aria-label="Step 1 of 3"><i class="on"></i><i></i><i></i></span>
-  </header>
-  <main class="card">
-    <h1>Connect your headset</h1>
-    <p class="lede">Turn on your Muse S Athena and put it on. Close the Muse app first: the headset talks to one app at a time.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroChat · Connect your headset</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <span class="brand">NeuroChat</span>
+      <span class="steps" role="img" aria-label="Step 1 of 3"
+        ><i class="on"></i><i></i><i></i
+      ></span>
+    </header>
+    <main class="card">
+      <h1>Connect your headset</h1>
+      <p class="lede">
+        Turn on your Muse S Athena and put it on. Close the Muse app first: the
+        headset talks to one app at a time.
+      </p>
 
-    <section id="find">
-      <button id="scanBtn" type="button" class="primary">Find my headset</button>
-      <ul id="devices" class="devices" aria-live="polite"></ul>
-      <p class="skip muted" id="simLink" hidden>Or <a href="#" id="simBtn">try a simulated headset</a></p>
-      <p class="skip muted" id="nativeLink" hidden>Not finding it? <a href="#" id="nativeBtn">Search from the companion app</a></p>
-      <p class="skip muted">No headset with you? <a href="/study.html">Use study mode</a>, <a href="/eyes.html">skip to eye tracking</a> or <a href="/chat">go straight to the chat</a></p>
-    </section>
+      <section id="find">
+        <button id="scanBtn" type="button" class="primary">
+          Find my headset
+        </button>
+        <ul id="devices" class="devices" aria-live="polite"></ul>
+        <p class="skip muted" id="simLink" hidden>
+          Or <a href="#" id="simBtn">try a simulated headset</a>
+        </p>
+        <p class="skip muted" id="nativeLink" hidden>
+          Not finding it?
+          <a href="#" id="nativeBtn">Search from the companion app</a>
+        </p>
+        <p class="skip muted">
+          No headset with you? <a href="/study.html">Use study mode</a>,
+          <a href="/eyes.html">skip to eye tracking</a> or
+          <a href="/chat">go straight to the chat</a>
+        </p>
+      </section>
 
-    <section id="live" hidden>
-      <svg id="head" viewBox="0 0 220 200" role="img" aria-label="Top view of a head showing the four sensors. Green means a sensor is reading cleanly.">
-        <ellipse cx="110" cy="105" rx="78" ry="88" class="skull"/>
-        <path d="M100 18 L110 6 L120 18" class="nose"/>
-        <g id="sensors"></g>
-      </svg>
-      <div id="waves" class="waves" role="img" aria-label="Live signal from each sensor" hidden></div>
-      <ul id="tips" class="tips"></ul>
-      <button id="continueBtn" type="button" class="primary" disabled>Continue</button>
-      <div class="connected">
-        <span class="dot" id="liveDot"></span>
-        <span id="deviceName"></span>
-        <span class="muted" id="rate"></span>
-        <button id="disconnectBtn" type="button" class="quiet">Disconnect</button>
-      </div>
-    </section>
+      <section id="live" hidden>
+        <svg
+          id="head"
+          viewBox="0 0 220 200"
+          role="img"
+          aria-label="Top view of a head showing the four sensors. Green means a sensor is reading cleanly."
+        >
+          <ellipse cx="110" cy="105" rx="78" ry="88" class="skull" />
+          <path d="M100 18 L110 6 L120 18" class="nose" />
+          <g id="sensors"></g>
+        </svg>
+        <div
+          id="waves"
+          class="waves"
+          role="img"
+          aria-label="Live signal from each sensor"
+          hidden
+        ></div>
+        <ul id="tips" class="tips"></ul>
+        <button id="continueBtn" type="button" class="primary" disabled>
+          Continue
+        </button>
+        <div class="connected">
+          <span class="dot" id="liveDot"></span>
+          <span id="deviceName"></span>
+          <span class="muted" id="rate"></span>
+          <button id="disconnectBtn" type="button" class="quiet">
+            Disconnect
+          </button>
+        </div>
+      </section>
 
-    <p id="message" class="message" role="status"></p>
-  </main>
-  <script src="bluetooth.js"></script>
-  <script src="app.js"></script>
-</body>
+      <p id="message" class="message" role="status"></p>
+    </main>
+    <script src="bluetooth.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>

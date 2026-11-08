@@ -6,14 +6,19 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
         with:
-          python-version: "3.12"
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
       - run: pip install -e ".[dev]"
       # Study mode's browser check (tests/test_study.py) skips without Node Playwright and Chromium.
       - run: npm i -g playwright@1.48 && npx playwright install --with-deps chromium

@@ -1,43 +1,71 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NeuroChat</title>
-  <link rel="stylesheet" href="sidepanel.css">
-</head>
-<body>
-  <header>
-    <span class="brand"><span class="spark" aria-hidden="true"></span>NeuroChat</span>
-    <button id="newBtn" type="button" class="icon" title="New chat on this page" aria-label="New chat on this page" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-    </button>
-  </header>
-
-  <main id="log" aria-live="polite">
-    <section class="empty" id="empty">
-      <h1><span class="grad">Hi there.</span><br>What are you reading?</h1>
-      <p>Select something on the page and click <b>Explain</b>, or start here.</p>
-      <div class="chips" id="chips">
-        <button type="button" data-ask="summarize">Summarize this page</button>
-        <button type="button" data-ask="simple">Explain the main idea simply</button>
-        <button type="button" data-ask="quiz">Quiz me on it</button>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <p id="status" class="status" role="status"></p>
-    <form id="ask" class="composer">
-      <div class="page" id="page" hidden><span class="dot"></span><span id="pageTitle"></span></div>
-      <textarea id="askInput" rows="1" placeholder="Ask about this page" aria-label="Ask the tutor"></textarea>
-      <button id="askBtn" type="submit" class="send" aria-label="Send">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroChat</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand"
+        ><span class="spark" aria-hidden="true"></span>NeuroChat</span
+      >
+      <button
+        id="newBtn"
+        type="button"
+        class="icon"
+        title="New chat on this page"
+        aria-label="New chat on this page"
+        hidden
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
       </button>
-    </form>
-    <p class="fine">Answers come from the model on this computer and can be wrong.</p>
-  </footer>
-  <script src="markdown.js"></script>
-  <script src="sidepanel.js"></script>
-</body>
+    </header>
+
+    <main id="log" aria-live="polite">
+      <section class="empty" id="empty">
+        <h1><span class="grad">Hi there.</span><br />What are you reading?</h1>
+        <p>
+          Select something on the page and click <b>Explain</b>, or start here.
+        </p>
+        <div class="chips" id="chips">
+          <button type="button" data-ask="summarize">
+            Summarize this page
+          </button>
+          <button type="button" data-ask="simple">
+            Explain the main idea simply
+          </button>
+          <button type="button" data-ask="quiz">Quiz me on it</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p id="status" class="status" role="status"></p>
+      <form id="ask" class="composer">
+        <div class="page" id="page" hidden>
+          <span class="dot"></span><span id="pageTitle"></span>
+        </div>
+        <textarea
+          id="askInput"
+          rows="1"
+          placeholder="Ask about this page"
+          aria-label="Ask the tutor"
+        ></textarea>
+        <button id="askBtn" type="submit" class="send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 19V5M6 11l6-6 6 6" />
+          </svg>
+        </button>
+      </form>
+      <p class="fine">
+        Answers come from the model on this computer and can be wrong.
+      </p>
+    </footer>
+    <script src="markdown.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
 </html>

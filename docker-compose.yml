@@ -7,12 +7,12 @@ services:
     build: .
     init: true
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # to find an Ollama running on this computer (Linux)
+      - 'host.docker.internal:host-gateway' # to find an Ollama running on this computer (Linux)
     ports:
-      - "127.0.0.1:8765:8765"
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:8765:8765'
+      - '127.0.0.1:3000:3000'
     volumes:
-      - neurochat:/app/backend/data   # Open WebUI's chats and settings
+      - neurochat:/app/backend/data # Open WebUI's chats and settings
     restart: unless-stopped
     # NVIDIA GPU on Linux or Windows? Uncomment to let Ollama use it.
     # deploy:

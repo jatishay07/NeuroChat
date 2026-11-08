@@ -1,0 +1,27 @@
+# Style check: the Google style guides as Ruff, Prettier, shfmt and ShellCheck
+# settings (docs/style.md). Fix failures locally with scripts/format.sh.
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install ruff==0.16.9 shfmt-py==4.2.0 shellcheck-py==0.11.0.1
+      - run: scripts/lint.sh

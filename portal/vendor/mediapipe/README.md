@@ -8,3 +8,4 @@ Served locally so eye tracking works offline (e.g. in the all-in-one Docker imag
   (Apache License 2.0).
 
 Only the SIMD build of the wasm is included; every current browser supports wasm SIMD.
+- `LICENSE`: the Apache License 2.0 text that covers both files.

@@ -1,83 +1,281 @@
 /* Study mode: one paragraph at a time. Uses the glass tokens from style.css and the tutor chat from tutor.css. */
-.study .top a.brand { text-decoration: none; }
-.study .card { text-align: left; max-width: 560px; }
-.study .card h1, .study #start .lede { text-align: center; }
-.study .skip { text-align: center; }
-.study #start > .small { text-align: center; }
-#source {
-  width: 100%; resize: vertical; min-height: 160px; padding: 16px 18px; border-radius: 22px;
-  font: 15px/1.55 var(--font); color: var(--fg); background: rgba(255, 255, 255, .55);
-  border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 2px rgba(20, 30, 60, .06); outline: none;
+.study .top a.brand {
+  text-decoration: none;
 }
-#source:focus-visible { border-color: rgba(11, 13, 18, .35); }
+.study .card {
+  text-align: left;
+  max-width: 560px;
+}
+.study .card h1,
+.study #start .lede {
+  text-align: center;
+}
+.study .skip {
+  text-align: center;
+}
+.study #start > .small {
+  text-align: center;
+}
+#source {
+  width: 100%;
+  resize: vertical;
+  min-height: 160px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  font: 15px/1.55 var(--font);
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 2px rgba(20, 30, 60, 0.06);
+  outline: none;
+}
+#source:focus-visible {
+  border-color: rgba(11, 13, 18, 0.35);
+}
 
 /* The paragraph: big, calm, centred in the window. */
-.study-reader { width: 100%; max-width: 680px; margin-top: 8vh; padding-bottom: 140px; display: grid; gap: 18px; }
-.study-reader .eyebrow { margin: 0; display: flex; gap: 10px; }
-.study-reader .eyebrow:not(:has(#section:not(:empty))) { display: none; } /* the dock already says where you are */
-.where { display: none; }
-.study-reader h1 { font-size: 36px; letter-spacing: -.04em; line-height: 1.1; }
-.study-para {
-  font-size: 21px; line-height: 1.75; white-space: pre-line; color: #2a2f38; margin: 0 -22px; padding: 18px 22px; border-radius: 24px;
-  box-shadow: inset 3px 0 0 transparent; transition: background .4s, box-shadow .4s;
+.study-reader {
+  width: 100%;
+  max-width: 680px;
+  margin-top: 8vh;
+  padding-bottom: 140px;
+  display: grid;
+  gap: 18px;
 }
-.study-para.enter { animation: rise .35s ease-out; }
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.study-reader .eyebrow {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+}
+.study-reader .eyebrow:not(:has(#section:not(:empty))) {
+  display: none;
+} /* the dock already says where you are */
+.where {
+  display: none;
+}
+.study-reader h1 {
+  font-size: 36px;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+.study-para {
+  font-size: 21px;
+  line-height: 1.75;
+  white-space: pre-line;
+  color: #2a2f38;
+  margin: 0 -22px;
+  padding: 18px 22px;
+  border-radius: 24px;
+  box-shadow: inset 3px 0 0 transparent;
+  transition:
+    background 0.4s,
+    box-shadow 0.4s;
+}
+.study-para.enter {
+  animation: rise 0.35s ease-out;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 /* Slow: a quiet amber edge and wash, nothing that jumps out. */
-.study-para.slow { background: rgba(255, 236, 214, .45); box-shadow: inset 3px 0 0 rgba(229, 138, 0, .55); }
+.study-para.slow {
+  background: rgba(255, 236, 214, 0.45);
+  box-shadow: inset 3px 0 0 rgba(229, 138, 0, 0.55);
+}
 
-.study-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.study button.explain { border: 1px solid var(--rule); background: rgba(255, 255, 255, .6); color: var(--fg); min-height: 36px; padding: 0 16px; font-size: 14px; }
-.study button.explain.nudge { background: var(--fg); border-color: var(--fg); color: #fff; }
-.study button.explain.nudge:hover:not(:disabled) { background: #262a33; }
-.cue { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #8a5200; }
-.cue i { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
-.cue[hidden] { display: none; }
+.study-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.study button.explain {
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--fg);
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.study button.explain.nudge {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: #fff;
+}
+.study button.explain.nudge:hover:not(:disabled) {
+  background: #262a33;
+}
+.cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #8a5200;
+}
+.cue i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.cue[hidden] {
+  display: none;
+}
 
 /* The explanation opens under the paragraph, as on the reading page. */
 .study section.tutor {
-  padding: 18px 22px 16px; border-top: 0; border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, .42)); border: 1px solid rgba(255, 255, 255, .9);
-  -webkit-backdrop-filter: blur(36px) saturate(190%); backdrop-filter: blur(36px) saturate(190%);
-  box-shadow: inset 0 1px 0 #fff, 0 24px 70px rgba(20, 30, 60, .14);
+  padding: 18px 22px 16px;
+  border-top: 0;
+  border-radius: 28px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.72),
+    rgba(255, 255, 255, 0.42)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  backdrop-filter: blur(36px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 24px 70px rgba(20, 30, 60, 0.14);
 }
-.study section.tutor { scroll-margin-bottom: 110px; } /* clear of the dock */
-.study section.tutor[hidden] { display: none; }
-.study .tutor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.study .chat { max-height: none; }
-.study .msg.tutor { font-size: 16px; border-top: 0; padding-top: 0; display: block; }
+.study section.tutor {
+  scroll-margin-bottom: 110px;
+} /* clear of the dock */
+.study section.tutor[hidden] {
+  display: none;
+}
+.study .tutor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.study .chat {
+  max-height: none;
+}
+.study .msg.tutor {
+  font-size: 16px;
+  border-top: 0;
+  padding-top: 0;
+  display: block;
+}
 
 /* Dock: back, where you are, next. */
 .study .dock {
-  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20;
-  display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .30)); border: 1px solid rgba(255, 255, 255, .85);
-  -webkit-backdrop-filter: blur(36px) saturate(190%); backdrop-filter: blur(36px) saturate(190%);
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(20, 30, 60, .06), 0 24px 70px rgba(20, 30, 60, .14);
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.62),
+    rgba(255, 255, 255, 0.3)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  backdrop-filter: blur(36px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(20, 30, 60, 0.06),
+    0 24px 70px rgba(20, 30, 60, 0.14);
 }
-.study .dock[hidden] { display: none; }
-.study .dock button.quiet { color: var(--fg); white-space: nowrap; }
-.count { font: 500 12px var(--mono); color: var(--muted); min-width: 44px; text-align: center; }
-.progress { width: 90px; height: 4px; border-radius: 4px; background: rgba(11, 13, 18, .1); overflow: hidden; }
-.progress i { display: block; height: 100%; width: 0; background: var(--fg); border-radius: 4px; transition: width .3s; }
+.study .dock[hidden] {
+  display: none;
+}
+.study .dock button.quiet {
+  color: var(--fg);
+  white-space: nowrap;
+}
+.count {
+  font: 500 12px var(--mono);
+  color: var(--muted);
+  min-width: 44px;
+  text-align: center;
+}
+.progress {
+  width: 90px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(11, 13, 18, 0.1);
+  overflow: hidden;
+}
+.progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--fg);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
 
-.slow-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-.slow-list:empty { display: none; }
+.slow-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.slow-list:empty {
+  display: none;
+}
 .slow-list button.quiet {
-  width: 100%; text-align: left; white-space: normal; line-height: 1.45; padding: 12px 16px; min-height: 0;
-  border-radius: 18px; background: rgba(255, 236, 214, .5); border: 1px solid rgba(229, 138, 0, .18); color: var(--fg);
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.45;
+  padding: 12px 16px;
+  min-height: 0;
+  border-radius: 18px;
+  background: rgba(255, 236, 214, 0.5);
+  border: 1px solid rgba(229, 138, 0, 0.18);
+  color: var(--fg);
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .study section.tutor, .study .dock { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .study section.tutor,
+  .study .dock {
+    background: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
-@media (prefers-reduced-motion: reduce) { .study-para.enter { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .study-para.enter {
+    animation: none;
+  }
+}
 @media (max-width: 640px) {
-  .study-reader { margin-top: 2vh; }
-  .study-reader .eyebrow { display: flex !important; }
-  .study-reader .eyebrow #section:not(:empty) + .where::before { content: "· "; }
-  .where { display: inline; }
-  .study-reader h1 { font-size: 28px; }
-  .study-para { font-size: 18px; margin: 0 -14px; padding: 14px; }
-  .progress { display: none; }
+  .study-reader {
+    margin-top: 2vh;
+  }
+  .study-reader .eyebrow {
+    display: flex !important;
+  }
+  .study-reader .eyebrow #section:not(:empty) + .where::before {
+    content: '· ';
+  }
+  .where {
+    display: inline;
+  }
+  .study-reader h1 {
+    font-size: 28px;
+  }
+  .study-para {
+    font-size: 18px;
+    margin: 0 -14px;
+    padding: 14px;
+  }
+  .progress {
+    display: none;
+  }
 }
