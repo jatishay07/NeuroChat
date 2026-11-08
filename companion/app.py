@@ -112,6 +112,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         setup = asyncio.create_task(webui.prepare())
+        if getattr(backend, "address", None) == "REPLAY":
+            await device.connect("REPLAY")  # --replay: start playing right away
+            if getattr(backend, "calibration", None):
+                engagement.set(*backend.calibration)
         yield
         setup.cancel()
         await device.disconnect()  # stop OpenMuse cleanly when the app exits
@@ -127,6 +131,9 @@ def create_app(
         time.monotonic,
     )
     app.state.engagement = engagement
+    app.state.last_prompt = (
+        None  # the latest system prompt sent, for the signals page
+    )
 
     def meaningful_eeg() -> bool:
         """Real headset EEG, or synthetic EEG with a known engagement level.
@@ -254,6 +261,36 @@ def create_app(
         if not meaningful_eeg():
             st["now"] = None
         return st
+
+    @app.get("/api/engagement/signals")
+    async def engagement_signals(seconds: float = 60.0):
+        """For the extension's signals page: θ/α/β power and engagement per
+        second over the last `seconds`, the α and β waves of the last 4 s, the
+        score now, and what is streaming. The plain simulated headset's noise is
+        drawn too, but flagged as not reaching the tutor.
+        """
+        playing = getattr(device.backend, "playing", None)
+        view = None
+        if device.state == "streaming":
+            view = engagement.view(min(max(seconds, 10.0), 120.0))
+        return {
+            "state": device.state,
+            "source": playing()
+            if callable(playing)
+            else (device.device.name if device.device else None),
+            "reaches_tutor": meaningful_eeg(),
+            "signals": view,
+        }
+
+    @app.get("/api/engagement/prompt")
+    async def engagement_prompt():
+        """The system prompt the tutor last received, and the one it would get
+        if the reader asked about a passage right now.
+        """
+        return {
+            "last": app.state.last_prompt,
+            "preview": SYSTEM_PROMPT + signals_for(None),
+        }
 
     @app.post("/api/engagement/calibration/{phase}/{step}")
     async def calibrate(phase: str, step: str):
@@ -444,6 +481,11 @@ def create_app(
                     )
                     continue
                 await ws.send_json({"type": "start"})
+                app.state.last_prompt = {
+                    "system": system,
+                    "at": time.time(),
+                    "turn": msg.get("type"),
+                }
                 reply = []
                 try:
                     async for text in tutor.stream(history, system):

@@ -44,6 +44,9 @@ summary (409 if not). Files: `data/sessions/<id>/` (or `$NEUROCHAT_DATA/sessions
 - Engagement — owner: engagement · used by: tutor, (planned) calibration screen:
   `GET /api/engagement`; `POST /api/engagement/calibration/{relax|task}/{start|finish}`;
   `PUT` / `DELETE /api/engagement/calibration`.
+  `GET /api/engagement/signals?seconds=60` → {state, source, reaches_tutor, signals: {seconds[], theta[], alpha[],
+  beta[], engagement[], score[], waves: {rate, alpha[], beta[]}, bands_hz, now, calibrated}};
+  `GET /api/engagement/prompt` → {last: {system, at, turn} | null, preview} (used by extension/signals/).
 - `GET /api/tutor`, `GET /api/webui`, `GET /chat` (→ /chat.html) — owner: side-chat.
 
 ## Window events in the page

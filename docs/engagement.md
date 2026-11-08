@@ -33,6 +33,25 @@ python -m companion.e2e                                          # end-to-end ch
 python -m companion.e2e --ollama http://127.0.0.1:11434          # same, with the real model answering
 ```
 
+## Seeing the signals
+
+The Chrome extension's **signals page** (the wave button in the side chat's header) shows what the
+headset buffer holds: the alpha and beta waves of the last 4 s, the share of theta, alpha and beta
+over the last minute, the engagement score with its band, and the system prompt the tutor was last
+given, with the part that came from the measurements highlighted. It reads `GET
+/api/engagement/signals` and `GET /api/engagement/prompt` once a second.
+
+To see it on real EEG without a headset, play a recording back as if it were streaming:
+
+```bash
+python -m companion --replay bird                 # public Muse recordings (Bird et al.), downloaded once
+python -m companion --replay my-calm.csv,my-focus.csv   # your own Mind Monitor / muselsl / NPZ / XDF files
+```
+
+`--replay bird` plays one person's relaxed, neutral and concentrating minutes in a loop, calibrated
+on that person's other session. The simulated headset's noise is drawn too, but the page says it never
+reaches the tutor.
+
 `python -m companion.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four
 people, relaxed / neutral / concentrating) and scores them. Concentrating reads above neutral for three
 of the four, and above it on held-out sessions; set `NEUROCHAT_BIRD_DATA=data/bird` to include that

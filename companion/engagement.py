@@ -28,6 +28,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
+import warnings
 
 import numpy as np
 from scipy.signal import butter
@@ -50,6 +51,9 @@ MIN_SESSION_SECONDS = (
     30.0  # uncalibrated: need this much of the reading to judge against
 )
 SESSION_SECONDS = 180.0  # ...and judge against at most this much (the headset buffer's length)
+SIGNAL_SECONDS = 60.0  # the signals page shows the last minute
+WAVE_SECONDS = 4.0  # ...and the last 4 s of the α and β waves
+WAVE_RATE = 64.0  # samples per second sent for the waves
 
 
 # ---- signal → engagement index -----------------------------------------------
@@ -156,6 +160,59 @@ def engagement_series(
         ]
     )
     return times, values
+
+
+def signal_view(
+    eeg: np.ndarray, srate: float, seconds: float = SIGNAL_SECONDS
+) -> dict:
+    """For drawing: per second over the last `seconds`, the θ, α and β power
+    (µV², averaged over clean channels) and the raw engagement index over the
+    15 s before it; plus the last WAVE_SECONDS of the α and β band of the
+    channel average, so the rhythms themselves can be shown.
+    """
+    duration = eeg.shape[1] / srate
+    ends, powers = epoch_band_powers(eeg, srate)
+    per_epoch = np.full((len(ends), 3), np.nan)
+    if len(ends):
+        with np.errstate(all="ignore"), warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            per_epoch = np.nanmean(powers, axis=1)
+    start = max(0.0, duration - seconds)
+    times = np.arange(np.floor(start) + 1, np.floor(duration) + 1e-9, 1.0)
+    bands, engagement = [], []
+    for t in times:
+        sec = per_epoch[(ends > t - 1) & (ends <= t)]
+        sec = sec[~np.isnan(sec).any(axis=1)] if len(sec) else sec
+        bands.append(
+            None
+            if not len(sec)
+            else [round(float(x), 2) for x in sec.mean(axis=0)]
+        )
+        win = powers[(ends > t - WINDOW_SECONDS) & (ends <= t)]
+        engagement.append(
+            _index(win) if t >= min(WINDOW_SECONDS, duration) else None
+        )
+    n = int(WAVE_SECONDS * srate)
+    x = preprocess(eeg[:, -max(n * 2, n) :], srate).mean(axis=0)[-n:]
+    step = max(1, int(srate // WAVE_RATE))
+
+    def band(lo_hi):
+        sos = butter(4, lo_hi, btype="bandpass", fs=srate, output="sos")
+        return [round(float(v), 2) for v in sosfiltfilt(sos, x)[::step]]
+
+    return {
+        "seconds": [round(float(t - duration), 1) for t in times],
+        "theta": [b and b[0] for b in bands],
+        "alpha": [b and b[1] for b in bands],
+        "beta": [b and b[2] for b in bands],
+        "engagement": [None if e is None else round(e, 4) for e in engagement],
+        "waves": {
+            "rate": round(srate / step, 2),
+            "alpha": band(ALPHA),
+            "beta": band(BETA),
+        },
+        "bands_hz": {"theta": THETA, "alpha": ALPHA, "beta": BETA},
+    }
 
 
 # ---- calibration and normalization -------------------------------------------
@@ -436,6 +493,27 @@ class LiveEngagement:
         scale.
         """
         return reading(raw, self._reference(), where)
+
+    def view(self, seconds: float = SIGNAL_SECONDS) -> dict | None:
+        """What the signals page draws: band powers and engagement over the last
+        `seconds`, the α and β waves of the last few seconds, and the score now.
+        """
+        srate = self._srate()
+        eeg = self._window(seconds + WINDOW_SECONDS)
+        if eeg.shape[1] < 2 * srate:
+            return None
+        v = signal_view(eeg, srate, seconds)
+        reference = self._reference()
+        v["score"] = [
+            None
+            if e is None or reference is None
+            else round(reference.normalize(e), 3)
+            for e in v["engagement"]
+        ]
+        now = self.now()
+        v["now"] = now.as_dict() if now else None
+        v["calibrated"] = self.calibration is not None
+        return v
 
     def status(self) -> dict:
         raw = self.raw_now()

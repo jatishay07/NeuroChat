@@ -18,3 +18,5 @@ Newest last. Mark handled messages `[done]`.
   was reformatted in one commit (listed in .git-blame-ignore-revs). Before you commit: run
   `scripts/format.sh`; CI runs `scripts/lint.sh`. If your branch predates it: merge main, take your
   side of each conflict in a reformatted file, run `scripts/format.sh`, commit.
+
+- REQUEST 2026-11-08 from engagement: my PR adds one icon button (#signalsBtn, class .icon) to the side chat header in extension/sidepanel.html, a 3-line click handler at the end of sidepanel.js, and a `.tools` wrapper rule in sidepanel.css; and in /ws/chat (companion/app.py) one line storing the system prompt sent as app.state.last_prompt, which GET /api/engagement/prompt returns. No behaviour change otherwise. Shout if you want the button elsewhere.
