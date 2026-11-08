@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "neurochat-companion"
+name = "neurochat"
 version = "0.1.0"
 description = "Local companion app for the struggle-aware tutor: headset connection, signals, detector, chat."
 requires-python = ">=3.11"
@@ -32,8 +32,8 @@ dev = [
   "shellcheck-py==0.11.0.1",
 ]
 
-[tool.setuptools]
-packages = ["companion", "companion.device"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -45,7 +45,7 @@ line-length = 80
 indent-width = 4
 target-version = "py311"
 # athena_decode.py is vendored from OpenMuse and re-copied from upstream as is.
-extend-exclude = ["portal/vendor", "portal/web", "companion/device/athena_decode.py"]
+extend-exclude = ["portal/vendor", "portal/web", "src/neurochat/device/athena_decode.py"]
 
 [tool.ruff.format]
 quote-style = "double"

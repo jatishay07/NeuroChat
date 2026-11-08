@@ -1,9 +1,9 @@
-// Unit tests for portal/study-pace.js (S2, S3, S4). Run: node --test tests/study/
+// Unit tests for portal/study/study-pace.js (S2, S3, S4). Run: node --test tests/study/
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 
-const P = createRequire(import.meta.url)('../../portal/study-pace.js');
+const P = createRequire(import.meta.url)('../../portal/study/study-pace.js');
 
 function memoryStorage() {
   const m = new Map();

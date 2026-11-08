@@ -1,5 +1,5 @@
 // Records a narrated video of the study-mode flow (not part of the suite):
-//   python -m companion --simulate  (or any running companion), then
+//   python -m neurochat --simulate  (or any running companion), then
 //   node tests/study/record.mjs http://127.0.0.1:8765 <out-dir>
 // Reading time is simulated with Playwright's clock (each paragraph's seconds are fast-forwarded);
 // the caption bar at the top says what is being done and what was simulated.

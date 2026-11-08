@@ -36,9 +36,9 @@ from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
 import numpy as np
 
-from .eyedata import score_saccades
-from .eyemove import detect
-from .eyemove import fit_gain
+from neurochat.research.eyedata import score_saccades
+from neurochat.signals.eyemove import detect
+from neurochat.signals.eyemove import fit_gain
 
 PULL_SECONDS = 1.0
 MAX_EVENT_BYTES = 64_000  # a paragraph's line layout fits easily; anything bigger is a mistake
@@ -46,7 +46,7 @@ MAX_EVENT_BYTES = 64_000  # a paragraph's line layout fits easily; anything bigg
 
 def data_root() -> Path:
     env = os.environ.get("NEUROCHAT_DATA")
-    base = Path(env) if env else Path(__file__).resolve().parent.parent / "data"
+    base = Path(env) if env else Path(__file__).resolve().parents[3] / "data"
     return base / "sessions"
 
 

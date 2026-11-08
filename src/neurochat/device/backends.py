@@ -85,7 +85,7 @@ class SimulatedBackend:
         self._t0 = time.monotonic()
         self._sent = 0
         if self.engagement is not None:
-            from ..synthetic import SyntheticStream
+            from neurochat.signals.synthetic import SyntheticStream
 
             self._stream = SyntheticStream(
                 self.engagement,

@@ -9,7 +9,7 @@ Everything runs on your own computer:
 
 | Piece                                                                           | Folder                 | Status                                                                   |
 | ------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------ |
-| Companion app: headset connection, signals, detector, local LLM                 | `companion/`           | Headset connection and tutor chat (Ollama) done                          |
+| Companion app: headset connection, signals, detector, local LLM                 | `src/neurochat/`       | Headset connection and tutor chat (Ollama) done                          |
 | Portal: connect screen, eye tracking, then the chat                             | `portal/`              | Connect screen and eye-tracking test done                                |
 | Chat portal: [Open WebUI](https://openwebui.com), for carrying on conversations | started by `neurochat` | Done                                                                     |
 | Side chat: Chrome extension that explains what you select on any page           | `extension/`           | Explain-on-select, right-click, shortcut; [install](extension/README.md) |
@@ -71,7 +71,7 @@ http://127.0.0.1:8765 opens in your browser and only works while the companion i
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"            # add ,hardware for a real headset: ".[dev,hardware]"
-python -m companion --simulate     # or: python -m companion
+python -m neurochat --simulate     # or: python -m neurochat
 ```
 
 </details>
@@ -177,7 +177,7 @@ From a clone, `docker compose up` does the same (`docker compose up --build` bui
 
 ## Engagement score → tutor prompt
 
-With a headset, `companion/engagement.py` turns EEG into a 0–1 engagement score
+With a headset, `src/neurochat/signals/engagement.py` turns EEG into a 0–1 engagement score
 the way the NeuroChat paper does, and the score's band (low, moderate, high)
 changes how the tutor explains. The method, the bands, the command-line tools and
 the calibration API are in [docs/engagement.md](docs/engagement.md).

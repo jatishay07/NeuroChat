@@ -24,14 +24,14 @@ import numpy as np
 from scipy.signal import butter
 from scipy.signal import sosfiltfilt
 
-from .device.backends import EEG_CHANNELS
-from .device.backends import EEG_SRATE
-from .eyemove import AF7
-from .eyemove import AF8
-from .eyemove import Saccade
-from .eyemove import TP9
-from .eyemove import TP10
-from .synthetic import synthetic_eeg
+from neurochat.device.backends import EEG_CHANNELS
+from neurochat.device.backends import EEG_SRATE
+from neurochat.signals.eyemove import AF7
+from neurochat.signals.eyemove import AF8
+from neurochat.signals.eyemove import Saccade
+from neurochat.signals.eyemove import TP9
+from neurochat.signals.eyemove import TP10
+from neurochat.signals.synthetic import synthetic_eeg
 
 VIEW_DISTANCE_MM = 600.0  # the dataset's viewing distance (about 60 cm)
 JUMP_MIN_MM = 5.0  # stimulus moves smaller than this aren't jumps
@@ -318,9 +318,9 @@ def evaluate(
     threshold, plus each recording's µV-per-degree gain, over the saccade
     recordings of the tracking dataset.
     """
-    from .eyemove import detect_blinks
-    from .eyemove import detect_saccades
-    from .eyemove import fit_gain
+    from neurochat.signals.eyemove import detect_blinks
+    from neurochat.signals.eyemove import detect_saccades
+    from neurochat.signals.eyemove import fit_gain
 
     pooled = {
         k: {"matches": [], "false_alarms": 0, "minutes": 0.0}
@@ -407,7 +407,7 @@ def main(argv: list[str] | None = None) -> None:
     import json
 
     p = argparse.ArgumentParser(
-        prog="python -m companion.eyedata",
+        prog="python -m neurochat.research.eyedata",
         description="Score the eye-movement detectors on the Afonso & Heinrichs Muse S dataset.",
     )
     p.add_argument("folder", help="unzipped csv_raw.zip")

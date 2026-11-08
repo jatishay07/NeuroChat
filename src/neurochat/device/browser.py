@@ -14,11 +14,11 @@ from datetime import UTC
 
 import numpy as np
 
-from .athena_decode import parse_message
-from .backends import BackendError
-from .backends import DeviceInfo
-from .backends import EEG_CHANNELS
-from .backends import EEG_SRATE
+from neurochat.device.athena_decode import parse_message
+from neurochat.device.backends import BackendError
+from neurochat.device.backends import DeviceInfo
+from neurochat.device.backends import EEG_CHANNELS
+from neurochat.device.backends import EEG_SRATE
 
 # The Athena sends the 4 EEG sensors first, then aux channels.
 N_EEG = len(EEG_CHANNELS)

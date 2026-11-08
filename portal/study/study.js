@@ -565,7 +565,7 @@ Batteries wear out because every trip back and forth slightly damages the materi
     const dwell = value(at);
     const msg = {type: 'explain', paragraph: p.text, index: at};
     if (doc.title) msg.title = doc.title;
-    // What study mode measured goes along so the tutor can pitch the explanation (companion/tutor.py).
+    // What study mode measured goes along so the tutor can pitch the explanation (src/neurochat/chat/tutor.py).
     if (dwell) msg.dwellMsPer100Words = dwell;
     if (median && samples >= P.MIN_SAMPLES) msg.medianMsPer100Words = median;
     if (p.visits > 1) msg.rereads = p.visits - 1;

@@ -3,22 +3,22 @@ import json
 import numpy as np
 import pytest
 
-from companion.engagement import bucket_for
-from companion.engagement import BUCKETS
-from companion.engagement import Calibration
-from companion.engagement import CalibrationError
-from companion.engagement import engagement_index
-from companion.engagement import engagement_notes
-from companion.engagement import engagement_series
-from companion.engagement import epoch_band_powers
-from companion.engagement import main
-from companion.engagement import reading
-from companion.engagement import score_recording
-from companion.recording import load_recording
-from companion.recording import save_csv
-from companion.synthetic import READING_SCRIPT
-from companion.synthetic import synthetic_eeg
-from companion.synthetic import synthetic_session
+from neurochat.signals.engagement import bucket_for
+from neurochat.signals.engagement import BUCKETS
+from neurochat.signals.engagement import Calibration
+from neurochat.signals.engagement import CalibrationError
+from neurochat.signals.engagement import engagement_index
+from neurochat.signals.engagement import engagement_notes
+from neurochat.signals.engagement import engagement_series
+from neurochat.signals.engagement import epoch_band_powers
+from neurochat.signals.engagement import main
+from neurochat.signals.engagement import reading
+from neurochat.signals.engagement import score_recording
+from neurochat.signals.recording import load_recording
+from neurochat.signals.recording import save_csv
+from neurochat.signals.synthetic import READING_SCRIPT
+from neurochat.signals.synthetic import synthetic_eeg
+from neurochat.signals.synthetic import synthetic_session
 
 SRATE = 256.0
 

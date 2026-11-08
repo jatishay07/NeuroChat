@@ -18,8 +18,8 @@ import os
 
 import httpx
 
-from .engagement import engagement_notes
-from .engagement import Reading
+from neurochat.signals.engagement import engagement_notes
+from neurochat.signals.engagement import Reading
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not OLLAMA_URL.startswith("http"):

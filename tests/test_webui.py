@@ -6,12 +6,12 @@ import httpx
 from test_tutor import chat_turn
 from test_tutor import fake_ollama
 
-from companion.app import create_app
-from companion.device import SimulatedBackend
-from companion.tutor import Tutor
-from companion.webui import build_chat
-from companion.webui import TUTOR_ID
-from companion.webui import WebUI
+from neurochat.app import create_app
+from neurochat.chat.tutor import Tutor
+from neurochat.chat.webui import build_chat
+from neurochat.chat.webui import TUTOR_ID
+from neurochat.chat.webui import WebUI
+from neurochat.device import SimulatedBackend
 
 
 def fake_webui(down=False, auth_required=False):

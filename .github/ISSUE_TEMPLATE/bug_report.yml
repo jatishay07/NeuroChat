@@ -31,7 +31,7 @@ body:
           start.cmd (Windows),
           Docker image,
           docker compose,
-          manual (python -m companion),
+          manual (python -m neurochat),
           Chrome extension,
         ]
     validations:

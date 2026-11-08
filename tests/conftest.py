@@ -1,6 +1,6 @@
 import pytest
 
-import companion.app
+import neurochat.app
 
 
 @pytest.fixture(autouse=True)
@@ -9,7 +9,7 @@ def allow_test_client_host(monkeypatch):
     localhost-only guard.
     """
     monkeypatch.setattr(
-        companion.app,
+        neurochat.app,
         "ALLOWED_HOSTS",
-        companion.app.ALLOWED_HOSTS | {"testserver"},
+        neurochat.app.ALLOWED_HOSTS | {"testserver"},
     )

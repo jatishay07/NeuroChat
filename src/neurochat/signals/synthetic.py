@@ -18,8 +18,8 @@ import numpy as np
 from scipy.signal import butter
 from scipy.signal import sosfiltfilt
 
-from .device.backends import EEG_CHANNELS
-from .device.backends import EEG_SRATE
+from neurochat.device.backends import EEG_CHANNELS
+from neurochat.device.backends import EEG_SRATE
 
 OFFSET_UV = 800.0
 BANDS = {"theta": (4.5, 6.5), "alpha": (8.0, 10.5), "beta": (12.0, 19.0)}

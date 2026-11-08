@@ -131,7 +131,7 @@
     $('offer').hidden = true;
     offered = null;
     $('chat').replaceChildren(); // a new paragraph starts a new conversation
-    // What the eye tracker measured goes along, so the tutor can pitch the explanation (companion/tutor.py).
+    // What the eye tracker measured goes along, so the tutor can pitch the explanation (src/neurochat/chat/tutor.py).
     send(
       {
         type: 'explain',

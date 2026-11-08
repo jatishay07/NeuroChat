@@ -15,10 +15,10 @@ from typing import Any
 
 import numpy as np
 
-from .backends import Backend
-from .backends import BackendError
-from .backends import DeviceInfo
-from .quality import channel_quality
+from neurochat.device.backends import Backend
+from neurochat.device.backends import BackendError
+from neurochat.device.backends import DeviceInfo
+from neurochat.device.quality import channel_quality
 
 BUFFER_SECONDS = (
     180  # covers a paragraph visit and a 2-minute engagement calibration

@@ -1,6 +1,6 @@
 import numpy as np
 
-from companion.device.quality import channel_quality
+from neurochat.device.quality import channel_quality
 
 SR = 256.0
 

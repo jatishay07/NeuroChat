@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>NeuroChat · Eye tracking</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="tutor.css" />
-    <link rel="stylesheet" href="gaze.css" />
-    <link rel="stylesheet" href="reader.css" />
+    <link rel="stylesheet" href="shared/style.css" />
+    <link rel="stylesheet" href="shared/tutor.css" />
+    <link rel="stylesheet" href="eyes/gaze.css" />
+    <link rel="stylesheet" href="shared/reader.css" />
   </head>
   <body class="eyes">
     <header class="top">
@@ -207,10 +207,10 @@
 
     <!-- WebEyeTrack (MIT), built from github.com/RedForestAI/WebEyeTrack; see vendor/webeyetrack/README.md. -->
     <script src="vendor/webeyetrack/webeyetrack.js"></script>
-    <script src="paragraph-tracker.js"></script>
-    <script src="gaze-correction.js"></script>
-    <script src="eyes.js"></script>
-    <script src="tutor.js"></script>
-    <script src="reader-ui.js"></script>
+    <script src="eyes/paragraph-tracker.js"></script>
+    <script src="eyes/gaze-correction.js"></script>
+    <script src="eyes/eyes.js"></script>
+    <script src="shared/tutor.js"></script>
+    <script src="shared/reader-ui.js"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 """Study mode (milestone 1, S1–S8).
 
-The pace logic is plain JavaScript (portal/study-pace.js), so its unit tests run
+The pace logic is plain JavaScript (portal/study/study-pace.js), so its unit tests run
 under Node; the page itself is checked in Chromium with Playwright against the
 real companion and a stand-in tutor. Both skip when Node or Playwright isn't
 installed.
@@ -20,9 +20,9 @@ import pytest
 from test_tutor import fake_ollama
 import uvicorn
 
-from companion.app import create_app
-from companion.device import SimulatedBackend
-from companion.tutor import Tutor
+from neurochat.app import create_app
+from neurochat.chat.tutor import Tutor
+from neurochat.device import SimulatedBackend
 
 ROOT = Path(__file__).resolve().parent.parent
 NODE = shutil.which("node")
@@ -32,14 +32,14 @@ def test_study_page_is_served_and_linked_from_home():
     with TestClient(create_app(SimulatedBackend())) as client:
         page = client.get("/study.html")
         assert page.status_code == 200 and "Study mode" in page.text
-        for asset in ("study.js", "study-pace.js", "study.css"):
+        for asset in ("study/study.js", "study/study-pace.js", "study/study.css"):
             assert f'"{asset}"' in page.text
             assert client.get(f"/{asset}").status_code == 200
         assert 'href="/study.html"' in client.get("/").text
 
 
 def test_study_page_needs_no_camera_or_headset():
-    js = (ROOT / "portal/study.js").read_text() + (
+    js = (ROOT / "portal/study/study.js").read_text() + (
         ROOT / "portal/study.html"
     ).read_text()
     for hardware in (
@@ -141,7 +141,7 @@ def test_study_mode_in_a_browser(tmp_path):
         server.should_exit = True
         thread.join(timeout=5)
     # The tutor was told how slow the paragraph was against the reader's own
-    # pace (companion/tutor.py).
+    # pace (src/neurochat/chat/tutor.py).
     explain, follow_up = ollama.chats[0], ollama.chats[1]
     system = explain["messages"][0]["content"]
     assert "their usual pace" in system and "2.2×" in system
@@ -153,7 +153,7 @@ def test_extension_uses_the_same_pace_engine():
     # The extension folder is loaded on its own, so it carries a copy; keep the
     # two identical.
     assert (ROOT / "extension/study/study-pace.js").read_text() == (
-        ROOT / "portal/study-pace.js"
+        ROOT / "portal/study/study-pace.js"
     ).read_text()
 
 

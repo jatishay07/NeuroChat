@@ -16,7 +16,7 @@ import time
 
 import numpy as np
 
-from .engagement import engagement_index
+from neurochat.signals.engagement import engagement_index
 
 MIN_VISIT_SECONDS = 0.3  # shorter visits are passing glances, not reading
 

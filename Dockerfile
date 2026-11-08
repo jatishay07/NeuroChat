@@ -17,9 +17,9 @@ RUN ollama serve >/dev/null 2>&1 & \
 # The companion gets its own virtualenv so its packages can't clash with Open WebUI's.
 WORKDIR /opt/neurochat
 COPY pyproject.toml README.md ./
-COPY companion ./companion
+COPY src ./src
 COPY portal ./portal
-# Editable install: the app serves ../portal relative to its own source folder.
+# Editable install: the app serves portal/ from the repo root next to src/.
 RUN python -m venv .venv && .venv/bin/pip install --no-cache-dir -e .
 COPY docker/entrypoint.sh /usr/local/bin/neurochat-entrypoint
 RUN chmod +x /usr/local/bin/neurochat-entrypoint

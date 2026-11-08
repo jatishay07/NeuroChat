@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 const require = createRequire(import.meta.url);
 const {chromium} = require('playwright');
-const P = require('../../portal/study-pace.js');
+const P = require('../../portal/study/study-pace.js');
 const [base, shots] = process.argv.slice(2);
 
 const browser = await chromium.launch(

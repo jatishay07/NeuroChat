@@ -18,8 +18,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .device.backends import EEG_CHANNELS
-from .device.backends import EEG_SRATE
+from neurochat.device.backends import EEG_CHANNELS
+from neurochat.device.backends import EEG_SRATE
 
 TIME_COLUMNS = ("timestamps", "timestamp", "time", "lsl_time", "unix_time")
 

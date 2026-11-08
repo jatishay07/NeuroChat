@@ -3,10 +3,10 @@ import asyncio
 import numpy as np
 import pytest
 
-from companion.device import BackendError
-from companion.device import DeviceManager
-from companion.device import manager as manager_mod
-from companion.device import SimulatedBackend
+from neurochat.device import BackendError
+from neurochat.device import DeviceManager
+from neurochat.device import manager as manager_mod
+from neurochat.device import SimulatedBackend
 
 
 def run(coro):
