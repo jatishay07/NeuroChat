@@ -46,7 +46,8 @@ done
 PY=""
 for cand in python3.13 python3.12 python3.11 python3; do
   if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
-    PY="$cand"; break
+    PY="$cand"
+    break
   fi
 done
 UV=""
@@ -94,8 +95,11 @@ older() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head 
 install_ollama() {
   echo "Installing the latest Ollama (runs the local model; may ask for your password)…"
   case "$(uname)" in
-    Darwin|Linux) curl -fsSL https://ollama.com/install.sh | sh ;;
-    *) echo "Install Ollama from https://ollama.com/download, then run neurochat again." >&2; return 1 ;;
+    Darwin | Linux) curl -fsSL https://ollama.com/install.sh | sh ;;
+    *)
+      echo "Install Ollama from https://ollama.com/download, then run neurochat again." >&2
+      return 1
+      ;;
   esac
 }
 
@@ -104,8 +108,12 @@ pick_ollama() {
   local best="" bestv="" c v
   for c in $(type -ap ollama) /Applications/Ollama.app/Contents/Resources/ollama /usr/local/bin/ollama; do
     [ -x "$c" ] || continue
-    v="$(ollama_version "$c")"; [ -n "$v" ] || continue
-    if [ -z "$bestv" ] || older "$bestv" "$v"; then best="$c"; bestv="$v"; fi
+    v="$(ollama_version "$c")"
+    [ -n "$v" ] || continue
+    if [ -z "$bestv" ] || older "$bestv" "$v"; then
+      best="$c"
+      bestv="$v"
+    fi
   done
   [ -n "$best" ] && OLLAMA="$best"
 }
@@ -129,9 +137,15 @@ start_ollama() {
     else
       "$OLLAMA" serve >/dev/null 2>&1 &
     fi
-    for _ in $(seq 1 40); do [ -n "$(server_version || true)" ] && break; sleep 0.5; done
+    for _ in $(seq 1 40); do
+      [ -n "$(server_version || true)" ] && break
+      sleep 0.5
+    done
   fi
-  [ -n "$(server_version || true)" ] || { echo "Ollama didn't start." >&2; return 1; }
+  [ -n "$(server_version || true)" ] || {
+    echo "Ollama didn't start." >&2
+    return 1
+  }
 }
 
 setup_model() {
@@ -139,10 +153,12 @@ setup_model() {
   if ! command -v "$OLLAMA" >/dev/null; then install_ollama && pick_ollama || return 1; fi
   start_ollama || return 1
   if "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
-    echo "Local model ready: $MODEL"; return 0
+    echo "Local model ready: $MODEL"
+    return 0
   fi
   echo "Downloading $MODEL (one time only)…"
-  local log; log="$(mktemp)"
+  local log
+  log="$(mktemp)"
   if ! "$OLLAMA" pull "$MODEL" 2>&1 | tee "$log"; then :; fi
   if grep -q "newer version of Ollama" "$log"; then
     # The model needs a newer Ollama than the one installed: update it and try once more.
@@ -152,7 +168,8 @@ setup_model() {
   if "$OLLAMA" list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$MODEL"; then
     echo "Local model ready: $MODEL"
   else
-    echo "Couldn't download $MODEL. If it says Ollama is too old, update it from https://ollama.com/download and run neurochat again." >&2; return 1
+    echo "Couldn't download $MODEL. If it says Ollama is too old, update it from https://ollama.com/download and run neurochat again." >&2
+    return 1
   fi
 }
 if [ -n "${NEUROCHAT_LLM_URL:-}" ]; then
@@ -168,7 +185,7 @@ install_command() {
   launcher="$(printf '#!/usr/bin/env bash\n# Installed by NeuroChat (%s). Updates and starts it.\nexec "%s" "$@"\n' "$REPO" "$SELF")"
   mkdir -p "$bin"
   if [ "$(cat "$bin/neurochat" 2>/dev/null)" != "$launcher" ]; then
-    printf '%s\n' "$launcher" > "$bin/neurochat"
+    printf '%s\n' "$launcher" >"$bin/neurochat"
     chmod +x "$bin/neurochat"
   fi
   case ":$PATH:" in *":$bin:"*) return ;; esac
@@ -179,7 +196,7 @@ install_command() {
     *) rc="$HOME/.profile" ;;
   esac
   if ! grep -qs 'NeuroChat: neurochat command' "$rc"; then
-    printf '\n# NeuroChat: neurochat command\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
+    printf '\n# NeuroChat: neurochat command\nexport PATH="$HOME/.local/bin:$PATH"\n' >>"$rc"
     echo "Added the neurochat command. Open a new terminal window, then just type: neurochat"
   fi
 }
@@ -217,7 +234,10 @@ else
   webui_vars+=(ENABLE_OPENAI_API=False)
 fi
 start_webui_docker() {
-  command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo "Docker isn't running." >&2; return 1; }
+  command -v docker >/dev/null && docker info >/dev/null 2>&1 || {
+    echo "Docker isn't running." >&2
+    return 1
+  }
   if docker container inspect neurochat-webui >/dev/null 2>&1; then
     docker start neurochat-webui >/dev/null || return 1
   else
@@ -232,7 +252,8 @@ start_webui_docker() {
       # Inside the container, this computer is host.docker.internal.
       for v in "${!env[@]}"; do
         case "${env[$v]}" in OPENAI_API_BASE_URL=*)
-          env[$v]="$(printf '%s' "${env[$v]}" | sed -E 's#//(127\.0\.0\.1|localhost)([:/]|$)#//host.docker.internal\2#')" ;;
+          env[$v]="$(printf '%s' "${env[$v]}" | sed -E 's#//(127\.0\.0\.1|localhost)([:/]|$)#//host.docker.internal\2#')"
+          ;;
         esac
       done
     fi
@@ -264,10 +285,10 @@ start_webui() {
     local) start_webui_local ;;
     # Keep using whichever it was set up with before, so earlier chats are still there.
     *) if [ ! -d "$REPO/.webui" ] && command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-         start_webui_docker || start_webui_local
-       else
-         start_webui_local
-       fi ;;
+      start_webui_docker || start_webui_local
+    else
+      start_webui_local
+    fi ;;
   esac
 }
 if curl -fsS --max-time 2 "http://127.0.0.1:$WEBUI_PORT/health" >/dev/null 2>&1; then
@@ -285,6 +306,9 @@ url="http://127.0.0.1:8765"
 opener=""
 command -v open >/dev/null && opener=open
 command -v xdg-open >/dev/null && opener=xdg-open
-[ -n "$opener" ] && ( sleep 2; "$opener" "$url" ) >/dev/null 2>&1 &
+[ -n "$opener" ] && (
+  sleep 2
+  "$opener" "$url"
+) >/dev/null 2>&1 &
 echo "Opening $url (Ctrl+C to stop)"
 python -m companion ${args[@]+"${args[@]}"} || true

@@ -13,3 +13,8 @@ Newest last. Mark handled messages `[done]`.
   the `study-page` command and `scripting` permission in manifest.json, a context-menu item and `toggleStudy` in
   background.js, and `explain()` in sidepanel.js passes `dwellMsPer100Words` / `medianMsPer100Words` when present.
   Please review in the PR; nothing in the existing Explain flow changes.
+- RESULT 2026-10-28 from style: the repo now follows the Google style guides (PR "Google style
+  guides + contributor docs"). Every .py/.js/.html/.css/.md/.sh file outside vendor code and .graph/
+  was reformatted in one commit (listed in .git-blame-ignore-revs). Before you commit: run
+  `scripts/format.sh`; CI runs `scripts/lint.sh`. If your branch predates it: merge main, take your
+  side of each conflict in a reformatted file, run `scripts/format.sh`, commit.

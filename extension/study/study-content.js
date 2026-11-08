@@ -5,92 +5,130 @@
 // chat. Turn it on with "Study this page" (right-click) or Alt+Shift+S; Esc or Exit turns it off.
 (() => {
   const P = self.StudyPace;
-  const LINE = 0.38;      // the reading line, as a share of the window's height from the top
-  const PREFIX = "neurochat.study.s:"; // one key per paragraph read ({v, t}), so tabs never overwrite each other
+  const LINE = 0.38; // the reading line, as a share of the window's height from the top
+  const PREFIX = 'neurochat.study.s:'; // one key per paragraph read ({v, t}), so tabs never overwrite each other
   const KEEP = 200;
 
-  let on = false, paras = [], at = -1, raf = 0, ticker = 0, watcher = null, recollect = 0;
+  let on = false,
+    paras = [],
+    at = -1,
+    raf = 0,
+    ticker = 0,
+    watcher = null,
+    recollect = 0;
   const samples = new Map(); // paragraph key -> {v, t}
   const state = new WeakMap(); // element -> its clock, visits, slow, frozen pace (survives re-collecting)
 
   // ---- the baseline: one reading per paragraph (keyed by page and text), shared by every tab ----
-  const ok = (s) => s && s.v > 0;
+  const ok = s => s && s.v > 0;
   async function load() {
     samples.clear();
-    for (const [k, s] of Object.entries(await chrome.storage.local.get(null))) if (k.startsWith(PREFIX) && ok(s)) samples.set(k.slice(PREFIX.length), s);
+    for (const [k, s] of Object.entries(await chrome.storage.local.get(null)))
+      if (k.startsWith(PREFIX) && ok(s)) samples.set(k.slice(PREFIX.length), s);
   }
   chrome.storage.onChanged.addListener((c, area) => {
-    if (area !== "local") return;
-    for (const [k, { newValue }] of Object.entries(c)) {
+    if (area !== 'local') return;
+    for (const [k, {newValue}] of Object.entries(c)) {
       if (!k.startsWith(PREFIX)) continue;
-      if (ok(newValue)) samples.set(k.slice(PREFIX.length), newValue); else samples.delete(k.slice(PREFIX.length));
+      if (ok(newValue)) samples.set(k.slice(PREFIX.length), newValue);
+      else samples.delete(k.slice(PREFIX.length));
     }
   });
   function keyOf(text) {
     let h = 5381;
-    for (const ch of location.origin + location.pathname + "\n" + text) h = (h * 33 + ch.codePointAt(0)) >>> 0;
+    for (const ch of location.origin + location.pathname + '\n' + text)
+      h = (h * 33 + ch.codePointAt(0)) >>> 0;
     return h.toString(36);
   }
   async function record(p) {
     const v = value(p);
     if (!v) return;
-    samples.set(p.key, { v, t: Date.now() });
-    chrome.storage.local.set({ [PREFIX + p.key]: { v, t: Date.now() } }).catch(() => {});
-    if (samples.size > KEEP) { // the oldest readings go first
-      const old = [...samples].sort((a, b) => a[1].t - b[1].t).slice(0, samples.size - KEEP).map(([k]) => k);
-      old.forEach((k) => samples.delete(k));
-      chrome.storage.local.remove(old.map((k) => PREFIX + k)).catch(() => {});
+    samples.set(p.key, {v, t: Date.now()});
+    chrome.storage.local
+      .set({[PREFIX + p.key]: {v, t: Date.now()}})
+      .catch(() => {});
+    if (samples.size > KEEP) {
+      // the oldest readings go first
+      const old = [...samples]
+        .sort((a, b) => a[1].t - b[1].t)
+        .slice(0, samples.size - KEEP)
+        .map(([k]) => k);
+      old.forEach(k => samples.delete(k));
+      chrome.storage.local.remove(old.map(k => PREFIX + k)).catch(() => {});
     }
   }
   // The usual pace without this paragraph, so it's never compared with itself.
   function stats(p) {
     const v = [...samples].filter(([k]) => k !== p.key).map(([, s]) => s.v);
-    return { median: P.median(v), samples: v.length };
+    return {median: P.median(v), samples: v.length};
   }
 
   // ---- what counts as a paragraph on a real page ----
-  const SKIP = "nav, header, footer, aside, form, button, table, sup, [role=navigation], [role=banner], [role=contentinfo], " +
-    "[aria-hidden=true], .references, .reflist, .mw-references-wrap, .infobox, .navbox, neurochat-pill, neurochat-study";
-  const BLOCK = "p, li, blockquote, dd, figcaption";
-  const textOf = (el) => el.innerText.replace(/\s+/g, " ").trim();
+  const SKIP =
+    'nav, header, footer, aside, form, button, table, sup, [role=navigation], [role=banner], [role=contentinfo], ' +
+    '[aria-hidden=true], .references, .reflist, .mw-references-wrap, .infobox, .navbox, neurochat-pill, neurochat-study';
+  const BLOCK = 'p, li, blockquote, dd, figcaption';
+  const textOf = el => el.innerText.replace(/\s+/g, ' ').trim();
   function contentRoot() {
     // The candidate with the most paragraph text: a promo card that is an <article> doesn't win.
-    const cands = [...document.querySelectorAll("article, main, [role=main]")];
-    let best = document.body, most = 0;
+    const cands = [...document.querySelectorAll('article, main, [role=main]')];
+    let best = document.body,
+      most = 0;
     for (const c of cands) {
-      const n = [...c.querySelectorAll("p")].reduce((s, p) => s + p.textContent.length, 0);
-      if (n > most) { most = n; best = c; }
+      const n = [...c.querySelectorAll('p')].reduce(
+        (s, p) => s + p.textContent.length,
+        0
+      );
+      if (n > most) {
+        most = n;
+        best = c;
+      }
     }
     return best;
   }
   function collect() {
     return [...contentRoot().querySelectorAll(BLOCK)]
-      .filter((el) => !el.closest(SKIP) && !el.parentElement.closest(BLOCK))
-      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
-      .map((el) => {
+      .filter(el => !el.closest(SKIP) && !el.parentElement.closest(BLOCK))
+      .filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })
+      .map(el => {
         const text = textOf(el);
         let p = state.get(el);
-        if (!p) state.set(el, p = { el, clock: new P.Clock(), visits: 0, slow: false });
+        if (!p)
+          state.set(
+            el,
+            (p = {el, clock: new P.Clock(), visits: 0, slow: false})
+          );
         // Text that updates live ("updated 5 s ago") keeps its clock; only what it says changes.
-        if (p.text !== text) Object.assign(p, { text, key: keyOf(text), words: P.words(text) });
+        if (p.text !== text)
+          Object.assign(p, {text, key: keyOf(text), words: P.words(text)});
         return p;
       })
-      .filter((p) => p.words >= P.MIN_WORDS);
+      .filter(p => p.words >= P.MIN_WORDS);
   }
 
   // The paragraph at the reading line (or the nearest one to it).
   function current() {
     const y = innerHeight * LINE;
-    let best = -1, gap = Infinity;
+    let best = -1,
+      gap = Infinity;
     paras.forEach((p, i) => {
       const r = p.el.getBoundingClientRect();
       const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
-      if (d < gap) { gap = d; best = i; }
+      if (d < gap) {
+        gap = d;
+        best = i;
+      }
     });
     return gap < innerHeight * 0.3 ? best : -1;
   }
 
-  const value = (p) => p.frozen !== undefined ? p.frozen : P.msPer100Words(p.clock.elapsed(), p.words);
+  const value = p =>
+    p.frozen !== undefined
+      ? p.frozen
+      : P.msPer100Words(p.clock.elapsed(), p.words);
 
   function leave() {
     const p = paras[at];
@@ -98,19 +136,22 @@
     if (!p) return;
     p.clock.stop();
     record(p);
-    p.el.classList.remove("neurochat-current");
-    p.el.classList.add("neurochat-dim");
+    p.el.classList.remove('neurochat-current');
+    p.el.classList.add('neurochat-dim');
   }
 
   function focus(i) {
     if (i === at) return;
     leave();
-    if (i < 0) { draw(); return; }
+    if (i < 0) {
+      draw();
+      return;
+    }
     at = i;
     const p = paras[i];
     p.visits++;
-    p.el.classList.remove("neurochat-dim");
-    p.el.classList.add("neurochat-current");
+    p.el.classList.remove('neurochat-dim');
+    p.el.classList.add('neurochat-current');
     if (!document.hidden) p.clock.start();
     mark();
   }
@@ -118,16 +159,16 @@
   function mark() {
     const p = paras[at];
     if (p && !p.slow) {
-      const { median, samples: n } = stats(p);
+      const {median, samples: n} = stats(p);
       p.slow = P.isSlow(value(p), median, n);
     }
-    paras.forEach((q) => q.el.classList.toggle("neurochat-slow", q.slow));
+    paras.forEach(q => q.el.classList.toggle('neurochat-slow', q.slow));
     draw();
   }
 
   // ---- the Explain pill next to the lit paragraph, and the dock ----
-  const host = document.createElement("neurochat-study");
-  const root = host.attachShadow({ mode: "closed" });
+  const host = document.createElement('neurochat-study');
+  const root = host.attachShadow({mode: 'closed'});
   const FONT = `-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, sans-serif`;
   root.innerHTML = `<style>
     :host { all: initial; }
@@ -155,51 +196,69 @@
   </style>
   <button type="button" class="pill" id="pill" hidden>Explain</button>
   <div class="dock" id="dock" role="status" hidden><i></i><b>Study mode</b><span class="count" id="count"></span><span id="cue"></span><button type="button" id="exit" aria-label="Turn off study mode">Exit</button></div>`;
-  const $ = (id) => root.getElementById(id);
+  const $ = id => root.getElementById(id);
 
   function draw() {
     const p = paras[at];
-    $("dock").hidden = !on;
-    $("pill").hidden = !on || !p;
-    $("count").textContent = on ? `${at < 0 ? "–" : at + 1} / ${paras.length}` : "";
-    $("cue").textContent = p?.slow ? "Slower than your usual pace" : "";
-    $("dock").classList.toggle("slow", !!p?.slow);
+    $('dock').hidden = !on;
+    $('pill').hidden = !on || !p;
+    $('count').textContent = on
+      ? `${at < 0 ? '–' : at + 1} / ${paras.length}`
+      : '';
+    $('cue').textContent = p?.slow ? 'Slower than your usual pace' : '';
+    $('dock').classList.toggle('slow', !!p?.slow);
     if (!p) return;
-    $("pill").classList.toggle("slow", p.slow);
-    $("pill").setAttribute("aria-label", `Explain paragraph ${at + 1} with NeuroChat`);
+    $('pill').classList.toggle('slow', p.slow);
+    $('pill').setAttribute(
+      'aria-label',
+      `Explain paragraph ${at + 1} with NeuroChat`
+    );
     const r = p.el.getBoundingClientRect();
-    const w = $("pill").offsetWidth || 80, h = $("pill").offsetHeight || 30;
+    const w = $('pill').offsetWidth || 80,
+      h = $('pill').offsetHeight || 30;
     // Beside the paragraph's top-right corner; above it when the paragraph runs to the window's edge.
     const beside = r.right + 12 + w <= innerWidth - 8;
     const left = beside ? r.right + 12 : Math.min(r.right, innerWidth - 8) - w;
     const top = beside ? Math.max(r.top, 8) : Math.max(r.top - h - 6, 8);
-    $("pill").style.left = `${scrollX + Math.max(8, left)}px`;
-    $("pill").style.top = `${scrollY + top}px`;
+    $('pill').style.left = `${scrollX + Math.max(8, left)}px`;
+    $('pill').style.top = `${scrollY + top}px`;
   }
 
   let note = 0;
-  function say(text) { // a short note in the dock, e.g. when there's nothing to study
+  function say(text) {
+    // a short note in the dock, e.g. when there's nothing to study
     clearTimeout(note);
     document.documentElement.append(host);
-    $("dock").hidden = false;
-    $("count").textContent = "";
-    $("cue").textContent = text;
-    note = setTimeout(() => { if (!on) host.remove(); }, 3000);
+    $('dock').hidden = false;
+    $('count').textContent = '';
+    $('cue').textContent = text;
+    note = setTimeout(() => {
+      if (!on) host.remove();
+    }, 3000);
   }
 
-  $("pill").addEventListener("click", () => {
+  $('pill').addEventListener('click', () => {
     const p = paras[at];
     if (!p) return;
     // Pace stops at Explain: reading the answer isn't reading the paragraph.
-    if (p.frozen === undefined) { p.frozen = value(p); p.clock.stop(); }
-    const { median, samples: n } = stats(p);
-    const request = { text: p.text.slice(0, 4000), title: document.title, url: location.href };
+    if (p.frozen === undefined) {
+      p.frozen = value(p);
+      p.clock.stop();
+    }
+    const {median, samples: n} = stats(p);
+    const request = {
+      text: p.text.slice(0, 4000),
+      title: document.title,
+      url: location.href,
+    };
     if (p.frozen) request.dwellMsPer100Words = p.frozen;
     if (median && n >= P.MIN_SAMPLES) request.medianMsPer100Words = median;
     if (p.visits > 1) request.rereads = p.visits - 1;
-    chrome.runtime.sendMessage({ type: "neurochat:explain", request }).catch(() => {});
+    chrome.runtime
+      .sendMessage({type: 'neurochat:explain', request})
+      .catch(() => {});
   });
-  $("exit").addEventListener("click", () => stop());
+  $('exit').addEventListener('click', () => stop());
 
   // ---- following the reader ----
   function follow() {
@@ -209,25 +268,50 @@
     focus(current());
     draw();
   }
-  const onScroll = () => { if (!raf) raf = requestAnimationFrame(follow); };
+  const onScroll = () => {
+    if (!raf) raf = requestAnimationFrame(follow);
+  };
   const onActivity = () => paras[at]?.clock.poke();
-  const onVisibility = () => { const c = paras[at]?.clock; if (c) document.hidden ? c.stop() : c.start(); };
-  const onHide = () => { const p = paras[at]; if (p) { p.clock.stop(); record(p); if (!document.hidden) p.clock.start(); } };
+  const onVisibility = () => {
+    const c = paras[at]?.clock;
+    if (c) document.hidden ? c.stop() : c.start();
+  };
+  const onHide = () => {
+    const p = paras[at];
+    if (p) {
+      p.clock.stop();
+      record(p);
+      if (!document.hidden) p.clock.start();
+    }
+  };
   function onKey(e) {
     // The real target, even inside a web component's shadow DOM.
     const t = e.composedPath()[0];
-    if (t?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "Escape") { stop(); return; }
+    if (
+      t?.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName) ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.altKey
+    )
+      return;
+    if (e.key === 'Escape') {
+      stop();
+      return;
+    }
     // j / k move one paragraph, like a feed reader; the page's own keys keep scrolling as usual.
-    const dir = { j: 1, k: -1 }[e.key];
+    const dir = {j: 1, k: -1}[e.key];
     if (!dir) return;
-    const next = paras[Math.min(paras.length - 1, Math.max(0, (at < 0 ? current() : at) + dir))];
+    const next =
+      paras[
+        Math.min(paras.length - 1, Math.max(0, (at < 0 ? current() : at) + dir))
+      ];
     if (!next) return;
     e.preventDefault();
     // scrollIntoView also scrolls a page whose text sits in its own scrolling panel.
     const was = next.el.style.scrollMarginTop;
     next.el.style.scrollMarginTop = `${Math.round(innerHeight * LINE - 4)}px`;
-    next.el.scrollIntoView({ block: "start", behavior: "smooth" });
+    next.el.scrollIntoView({block: 'start', behavior: 'smooth'});
     next.el.style.scrollMarginTop = was; // the scroll target is fixed when it starts; leave the page as it was
   }
   // Infinite scroll and single-page apps change the article while you read: collect again.
@@ -236,16 +320,30 @@
     if (!on) return;
     const lit = paras[at];
     const next = collect();
-    for (const p of paras) if (!next.includes(p)) p.el.classList.remove("neurochat-dim", "neurochat-current", "neurochat-slow");
-    for (const p of next) if (p !== lit) p.el.classList.add("neurochat-dim");
-    if (lit && !next.includes(lit)) { lit.clock.stop(); record(lit); }
+    for (const p of paras)
+      if (!next.includes(p))
+        p.el.classList.remove(
+          'neurochat-dim',
+          'neurochat-current',
+          'neurochat-slow'
+        );
+    for (const p of next) if (p !== lit) p.el.classList.add('neurochat-dim');
+    if (lit && !next.includes(lit)) {
+      lit.clock.stop();
+      record(lit);
+    }
     paras = next;
     at = lit ? paras.indexOf(lit) : -1;
     focus(current()); // not follow(): the page changing by itself isn't the reader doing something
     draw();
   }
-  const onMutate = (records) => {
-    if (records.every((r) => host.contains(r.target) || r.target === document.documentElement)) return;
+  const onMutate = records => {
+    if (
+      records.every(
+        r => host.contains(r.target) || r.target === document.documentElement
+      )
+    )
+      return;
     // At most every 400 ms, even on a page that never stops changing.
     if (!recollect) recollect = setTimeout(refresh, 400);
   };
@@ -255,27 +353,43 @@
     if (on) return;
     await load();
     paras = collect();
-    if (!paras.length) { say("No paragraphs to study on this page"); return; }
+    if (!paras.length) {
+      say('No paragraphs to study on this page');
+      return;
+    }
     on = true;
     clearTimeout(note);
-    style = document.createElement("style");
+    style = document.createElement('style');
     style.textContent = `
       html.neurochat-study .neurochat-dim { opacity: .32 !important; transition: opacity .25s ease !important; }
       html.neurochat-study .neurochat-current { opacity: 1 !important; transition: opacity .25s ease, box-shadow .3s ease !important; }
       html.neurochat-study .neurochat-current.neurochat-slow { box-shadow: -12px 0 0 -9px rgba(229, 138, 0, .75) !important; }`;
     document.documentElement.append(style, host);
-    document.documentElement.classList.add("neurochat-study");
-    paras.forEach((p) => p.el.classList.add("neurochat-dim"));
+    document.documentElement.classList.add('neurochat-study');
+    paras.forEach(p => p.el.classList.add('neurochat-dim'));
     // Capture: also hears pages whose text scrolls inside a panel rather than the window.
-    addEventListener("scroll", onScroll, { capture: true, passive: true });
-    addEventListener("resize", onScroll, { passive: true });
-    addEventListener("keydown", onKey, true);
-    for (const ev of ["keydown", "pointermove", "pointerdown", "wheel", "touchstart"]) addEventListener(ev, onActivity, { passive: true });
-    document.addEventListener("visibilitychange", onVisibility);
-    addEventListener("pagehide", onHide);
+    addEventListener('scroll', onScroll, {capture: true, passive: true});
+    addEventListener('resize', onScroll, {passive: true});
+    addEventListener('keydown', onKey, true);
+    for (const ev of [
+      'keydown',
+      'pointermove',
+      'pointerdown',
+      'wheel',
+      'touchstart',
+    ])
+      addEventListener(ev, onActivity, {passive: true});
+    document.addEventListener('visibilitychange', onVisibility);
+    addEventListener('pagehide', onHide);
     watcher = new MutationObserver(onMutate);
-    watcher.observe(document.body, { childList: true, subtree: true, characterData: true });
-    ticker = setInterval(() => { if (at >= 0) mark(); }, 1000);
+    watcher.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    ticker = setInterval(() => {
+      if (at >= 0) mark();
+    }, 1000);
     follow();
   }
 
@@ -287,25 +401,48 @@
     clearTimeout(recollect);
     recollect = 0;
     watcher?.disconnect();
-    removeEventListener("scroll", onScroll, { capture: true });
-    removeEventListener("resize", onScroll);
-    removeEventListener("keydown", onKey, true);
-    for (const ev of ["keydown", "pointermove", "pointerdown", "wheel", "touchstart"]) removeEventListener(ev, onActivity);
-    document.removeEventListener("visibilitychange", onVisibility);
-    removeEventListener("pagehide", onHide);
-    document.documentElement.classList.remove("neurochat-study");
-    paras.forEach((p) => p.el.classList.remove("neurochat-dim", "neurochat-current", "neurochat-slow"));
+    removeEventListener('scroll', onScroll, {capture: true});
+    removeEventListener('resize', onScroll);
+    removeEventListener('keydown', onKey, true);
+    for (const ev of [
+      'keydown',
+      'pointermove',
+      'pointerdown',
+      'wheel',
+      'touchstart',
+    ])
+      removeEventListener(ev, onActivity);
+    document.removeEventListener('visibilitychange', onVisibility);
+    removeEventListener('pagehide', onHide);
+    document.documentElement.classList.remove('neurochat-study');
+    paras.forEach(p =>
+      p.el.classList.remove(
+        'neurochat-dim',
+        'neurochat-current',
+        'neurochat-slow'
+      )
+    );
     style?.remove();
     host.remove();
     paras = [];
   }
 
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-    if (msg.type !== "neurochat:study") return;
-    (on ? (stop(), Promise.resolve()) : start()).then(() => reply({ on, paragraphs: paras.length }));
+    if (msg.type !== 'neurochat:study') return;
+    (on ? (stop(), Promise.resolve()) : start()).then(() =>
+      reply({on, paragraphs: paras.length})
+    );
     return true;
   });
 
   // Read-only view for tests (tests/study/extension.mjs).
-  self.__neurochatStudy = { state: () => ({ on, at, paragraphs: paras.length, slow: paras.map((p) => p.slow), samples: samples.size }) };
+  self.__neurochatStudy = {
+    state: () => ({
+      on,
+      at,
+      paragraphs: paras.length,
+      slow: paras.map(p => p.slow),
+      samples: samples.size,
+    }),
+  };
 })();

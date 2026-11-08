@@ -35,7 +35,7 @@ fi
 
 (
   cd /opt/neurochat
-  while true; do  # restart the companion if it ever exits
+  while true; do # restart the companion if it ever exits
     .venv/bin/python -m companion --simulate "$@" || true
     sleep 2
   done

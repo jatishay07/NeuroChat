@@ -20,3 +20,8 @@ Newest last. Mark handled messages `[done]`.
   time); (2) `companion/app.py`: one `app.include_router(record_router(device))` line. Everything else
   is new and mine: `companion/session_record.py`, `portal/record.html|js|css`,
   `tests/test_session_record.py`; contract added to CONTRACTS.md.
+- REQUEST 2026-10-28 from style: register thread `style` (.graph/threads/style.md) and review the
+  Google-style PR. It adds .github/workflows/lint.yml (your folder; new file only) and reformats your
+  interim files (start.sh, docker/entrypoint.sh, portal/*). It conflicts with #42 only in formatting:
+  either order works, the second one takes its own side and runs scripts/format.sh. .graph/ and
+  CLAUDE.md are deliberately not reformatted.

@@ -1,14 +1,19 @@
-import time
 from pathlib import Path
+import time
 
 from fastapi.testclient import TestClient
 
 from companion.app import create_app
-from companion.device import BrowserHeadset, SimulatedBackend
+from companion.device import BrowserHeadset
+from companion.device import SimulatedBackend
 
-# A few seconds of raw Bluetooth notifications from a Muse S Athena (preset p1041),
-# from OpenMuse's public test data (tests/test_data/data_p1041.txt).
-LINES = (Path(__file__).parent / "fixtures" / "athena_p1041.txt").read_text().splitlines()
+# A few seconds of raw Bluetooth notifications from a Muse S Athena (preset
+# p1041), from OpenMuse's public test data (tests/test_data/data_p1041.txt).
+LINES = (
+    (Path(__file__).parent / "fixtures" / "athena_p1041.txt")
+    .read_text()
+    .splitlines()
+)
 PACKETS = [line.split("\t")[1:3] for line in LINES]
 
 
@@ -36,20 +41,31 @@ def test_browser_session_streams_then_disconnects():
         with client.websocket_connect("/ws/headset") as ws:
             ws.send_json({"type": "hello", "name": "Muse-S-1234"})
             for i in range(0, len(PACKETS), 10):
-                ws.send_json({"type": "data", "packets": PACKETS[i:i + 10]})
+                ws.send_json({"type": "data", "packets": PACKETS[i : i + 10]})
             s = wait_for(client, lambda s: s["state"] == "streaming")
-            assert s["device"] == {"name": "Muse-S-1234", "address": "browser", "rssi": None}
+            assert s["device"] == {
+                "name": "Muse-S-1234",
+                "address": "browser",
+                "rssi": None,
+            }
         s = wait_for(client, lambda s: s["state"] == "idle")
         assert s["device"] is None
         # The simulated headset is back for the next connection.
-        assert client.post("/api/device/scan", params={"timeout": 1}).json()["devices"][0]["address"] == "SIM-0001"
+        assert (
+            client.post("/api/device/scan", params={"timeout": 1}).json()[
+                "devices"
+            ][0]["address"]
+            == "SIM-0001"
+        )
 
 
 def test_lost_bluetooth_shows_the_reason():
     with TestClient(create_app(SimulatedBackend())) as client:
         with client.websocket_connect("/ws/headset") as ws:
             ws.send_json({"type": "hello", "name": "Muse"})
-            ws.send_json({"type": "lost", "message": "The headset disconnected."})
+            ws.send_json(
+                {"type": "lost", "message": "The headset disconnected."}
+            )
         s = wait_for(client, lambda s: s["state"] == "error")
         assert s["error"] == "The headset disconnected."
 
@@ -60,6 +76,8 @@ def test_portal_disconnect_ends_the_browser_session():
             ws.send_json({"type": "hello", "name": "Muse"})
             ws.send_json({"type": "data", "packets": PACKETS[:40]})
             wait_for(client, lambda s: s["state"] == "streaming")
-            assert client.post("/api/device/disconnect").json()["state"] == "idle"
+            assert (
+                client.post("/api/device/disconnect").json()["state"] == "idle"
+            )
             ws.send_json({"type": "data", "packets": PACKETS[40:50]})
             assert ws.receive()["type"] == "websocket.close"

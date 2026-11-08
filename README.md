@@ -7,12 +7,12 @@ Muse S Athena's fNIRS (a second, slower sign of mental effort).
 
 Everything runs on your own computer:
 
-| Piece | Folder | Status |
-|---|---|---|
-| Companion app: headset connection, signals, detector, local LLM | `companion/` | Headset connection and tutor chat (Ollama) done |
-| Portal: connect screen, eye tracking, then the chat | `portal/` | Connect screen and eye-tracking test done |
-| Chat portal: [Open WebUI](https://openwebui.com), for carrying on conversations | started by `neurochat` | Done |
-| Side chat: Chrome extension that explains what you select on any page | `extension/` | Explain-on-select, right-click, shortcut; [install](extension/README.md) |
+| Piece                                                                           | Folder                 | Status                                                                   |
+| ------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------ |
+| Companion app: headset connection, signals, detector, local LLM                 | `companion/`           | Headset connection and tutor chat (Ollama) done                          |
+| Portal: connect screen, eye tracking, then the chat                             | `portal/`              | Connect screen and eye-tracking test done                                |
+| Chat portal: [Open WebUI](https://openwebui.com), for carrying on conversations | started by `neurochat` | Done                                                                     |
+| Side chat: Chrome extension that explains what you select on any page           | `extension/`           | Explain-on-select, right-click, shortcut; [install](extension/README.md) |
 
 No headset? Everything except the EEG works without one, and `--simulate` fakes it. The tutor runs on
 **any model you like**: Qwen3.5 4B in Ollama by default, or your own (see [Use your own model](#use-your-own-model)).
@@ -73,6 +73,7 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\act
 pip install -e ".[dev]"            # add ,hardware for a real headset: ".[dev,hardware]"
 python -m companion --simulate     # or: python -m companion
 ```
+
 </details>
 
 Click **Find my headset**, and connect. Just want the chatbot? Click **go straight to the chat**: it opens
@@ -89,11 +90,11 @@ Open WebUI to keep going there, with its chat history, search and model picker.
 
 The tutor works with any chat model. Two environment variables pick it:
 
-| Variable | Default | What |
-|---|---|---|
-| `NEUROCHAT_MODEL` | `qwen3.5:4b` | The model's name, as your model server knows it |
-| `NEUROCHAT_LLM_URL` | (empty: Ollama) | An [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) server's base URL, ending in `/v1` |
-| `NEUROCHAT_LLM_API_KEY` | (none) | Its API key, if it needs one |
+| Variable                | Default         | What                                                                                                           |
+| ----------------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `NEUROCHAT_MODEL`       | `qwen3.5:4b`    | The model's name, as your model server knows it                                                                |
+| `NEUROCHAT_LLM_URL`     | (empty: Ollama) | An [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) server's base URL, ending in `/v1` |
+| `NEUROCHAT_LLM_API_KEY` | (none)          | Its API key, if it needs one                                                                                   |
 
 **Any Ollama model** ([library](https://ollama.com/library)): `neurochat` downloads it on first run.
 
@@ -176,49 +177,16 @@ From a clone, `docker compose up` does the same (`docker compose up --build` bui
 
 ## Engagement score → tutor prompt
 
-`companion/engagement.py` is the NeuroChat kernel, computed the way the paper does (§3.2): 1–30 Hz
-band-pass and 60 Hz notch, 1 s epochs every 250 ms, engagement = β / (α + θ) with θ 4–7, α 7–11 and
-β 11–20 Hz, band powers averaged over a 15 s window that moves every second. Epochs with blinks or a
-sensor off the skin are dropped. A calibration (2 min relaxing, 2 min word chain) gives E_min and
-E_max, and the score is normalized to 0–1 against them. Without a calibration the score is relative
-to the reading's own range.
-
-The score falls in one of three bands, and each band adds its own instructions to Qwen's system prompt:
-
-| Band | Score | What the tutor is told |
-|---|---|---|
-| Low | under 0.3 | Under 80 words, a small story or familiar example, one idea, end with a question that sparks curiosity |
-| Moderate | 0.3 to 0.6 | Normal depth up to 120 words, main idea first, define jargon, check what's unclear |
-| High | 0.6 and up | More technical, explain the mechanism, up to 180 words, connect to a related idea |
-
-When you ask about a paragraph, the score is the one from while your eyes were on it; for an added
-passage it's that passage's own; for a follow-up question it's the last 15 seconds, as in the paper.
-The model is told never to mention or hint at the EEG, and the end-to-end check fails if a reply does. The plain simulated headset's EEG is noise and never
-reaches the prompt.
-
-```bash
-python -m companion.engagement synth --out synthetic-eeg        # relax.csv, task.csv, reading.csv, labels.json
-python -m companion.engagement score synthetic-eeg/reading.csv \
-    --relax synthetic-eeg/relax.csv --task synthetic-eeg/task.csv  # per-second score and band
-python -m companion --simulate --engagement demo                 # live: low, moderate, high every 60 s
-python -m companion.e2e                                          # end-to-end check, about a minute
-python -m companion.e2e --ollama http://127.0.0.1:11434          # same, with the real model answering
-```
-
-`python -m companion.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four
-people, relaxed / neutral / concentrating) and scores them. Concentrating reads above neutral for three
-of the four, and above it on held-out sessions; set `NEUROCHAT_BIRD_DATA=data/bird` to include that
-check in `pytest`.
-
-`score` reads a real recording too: Mind Monitor or muselsl CSVs (TP9, AF7, AF8, TP10 columns), NPZ,
-or XDF (with `pip install pyxdf`). Live calibration is `POST /api/engagement/calibration/relax/start`,
-then `/relax/finish`, the same for `task`; `PUT /api/engagement/calibration` sets E_min and E_max from
-an offline one, and `GET /api/engagement` shows the score now.
+With a headset, `companion/engagement.py` turns EEG into a 0–1 engagement score
+the way the NeuroChat paper does, and the score's band (low, moderate, high)
+changes how the tutor explains. The method, the bands, the command-line tools and
+the calibration API are in [docs/engagement.md](docs/engagement.md).
 
 ## Tests
 
 ```bash
-pytest
+pytest               # unit tests, the end-to-end check and study mode's browser check
+scripts/lint.sh      # style checks (Google style guides; see docs/style.md)
 ```
 
 ## Data
@@ -235,7 +203,8 @@ companion refuses requests from other websites. Details, and how to report a pro
 
 ## Contributing
 
-Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for setup and
+[docs/style.md](docs/style.md) for code style. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
@@ -243,6 +212,6 @@ NeuroChat is under the [MIT License](LICENSE). It includes WebEyeTrack (MIT), Me
 OpenMuse's parser (MIT), and the Docker image bundles Open WebUI, Ollama and the Qwen3.5 model under their
 own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Based on *NeuroChat: A Neuroadaptive AI Chatbot for Customizing Learning Experiences*
+Based on _NeuroChat: A Neuroadaptive AI Chatbot for Customizing Learning Experiences_
 ([arXiv 2503.07599](https://arxiv.org/abs/2503.07599)). The eye tracker is
 [WebEyeTrack](https://arxiv.org/abs/2508.19544) by Davalos et al.

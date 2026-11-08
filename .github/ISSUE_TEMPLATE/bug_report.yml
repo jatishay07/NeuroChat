@@ -25,14 +25,22 @@ body:
     id: how
     attributes:
       label: How do you run it?
-      options: [neurochat / start.sh, start.cmd (Windows), Docker image, docker compose, manual (python -m companion), Chrome extension]
+      options:
+        [
+          neurochat / start.sh,
+          start.cmd (Windows),
+          Docker image,
+          docker compose,
+          manual (python -m companion),
+          Chrome extension,
+        ]
     validations:
       required: true
   - type: input
     id: system
     attributes:
       label: OS, browser and model
-      placeholder: "macOS 15 on Apple Silicon, Chrome 141, qwen3.5:4b in Ollama"
+      placeholder: 'macOS 15 on Apple Silicon, Chrome 141, qwen3.5:4b in Ollama'
   - type: dropdown
     id: headset
     attributes:

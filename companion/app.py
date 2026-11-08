@@ -3,58 +3,92 @@
 Everything listens on localhost only. The portal and, later, the browser
 extension use the same endpoints.
 """
+
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 import re
 import time
-from contextlib import asynccontextmanager
-from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi import WebSocket
+from fastapi import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.websockets import WebSocketClose
 
-from .device import Backend, BackendError, BrowserHeadset, DeviceManager
-from .engagement import CalibrationError, LiveEngagement
-from .gaze import GazeSession, visit_json
+from .device import Backend
+from .device import BackendError
+from .device import BrowserHeadset
+from .device import DeviceManager
+from .engagement import CalibrationError
+from .engagement import LiveEngagement
+from .gaze import GazeSession
+from .gaze import visit_json
 from .session_record import record_router
-from .tutor import CHAT_PROMPT, SYSTEM_PROMPT, Tutor, TutorError, explain_request, reader_notes
-from .webui import WebUI, WebUIError
+from .tutor import CHAT_PROMPT
+from .tutor import explain_request
+from .tutor import reader_notes
+from .tutor import SYSTEM_PROMPT
+from .tutor import Tutor
+from .tutor import TutorError
+from .webui import WebUI
+from .webui import WebUIError
 
 PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
 
-# Who may talk to the companion. CORS alone isn't enough: browsers don't apply it to WebSockets or
-# to simple POSTs, so any website you visit could otherwise drive the tutor or read the headset
-# through ws://127.0.0.1:8765. Allowed: the portal itself, Open WebUI and the browser extension.
-ALLOWED_ORIGINS = re.compile(r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?)$")
-# Host names the companion answers to, against DNS rebinding. NEUROCHAT_ALLOWED_HOSTS adds more
-# (comma-separated), e.g. to reach it from another device on purpose.
-ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]", "host.docker.internal",
-                 *filter(None, os.environ.get("NEUROCHAT_ALLOWED_HOSTS", "").split(","))}
+# Who may talk to the companion. CORS alone isn't enough: browsers don't apply
+# it to WebSockets or to simple POSTs, so any website you visit could otherwise
+# drive the tutor or read the headset through ws://127.0.0.1:8765. Allowed: the
+# portal itself, Open WebUI and the browser extension.
+ALLOWED_ORIGINS = re.compile(
+    r"^(chrome-extension://.*|http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?)$"
+)
+# Host names the companion answers to, against DNS rebinding.
+# NEUROCHAT_ALLOWED_HOSTS adds more (comma-separated), e.g. to reach it from
+# another device on purpose.
+ALLOWED_HOSTS = {
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+    "host.docker.internal",
+    *filter(None, os.environ.get("NEUROCHAT_ALLOWED_HOSTS", "").split(",")),
+}
 
 
 class LocalOnly:
-    """Refuses requests from other websites (by Origin) and to other host names (by Host)."""
+    """Refuses requests from other websites (by Origin) and to other host names
+    (by Host).
+    """
 
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
         if scope["type"] in ("http", "websocket"):
-            headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope["headers"]}
+            headers = {
+                k.decode("latin-1"): v.decode("latin-1")
+                for k, v in scope["headers"]
+            }
             host = re.sub(r":\d+$", "", headers.get("host", ""))
             origin = headers.get("origin")
-            if host not in ALLOWED_HOSTS or (origin is not None and not ALLOWED_ORIGINS.match(origin)):
+            if host not in ALLOWED_HOSTS or (
+                origin is not None and not ALLOWED_ORIGINS.match(origin)
+            ):
                 if scope["type"] == "websocket":
                     await WebSocketClose(code=1008)(scope, receive, send)
                 else:
-                    await PlainTextResponse("NeuroChat only answers its own pages on this computer.",
-                                            status_code=403)(scope, receive, send)
+                    await PlainTextResponse(
+                        "NeuroChat only answers its own pages on this computer.",
+                        status_code=403,
+                    )(scope, receive, send)
                 return
         await self.app(scope, receive, send)
 
@@ -68,7 +102,9 @@ class CalibrationValues(BaseModel):
     e_max: float
 
 
-def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None = None) -> FastAPI:
+def create_app(
+    backend: Backend, tutor: Tutor | None = None, webui: WebUI | None = None
+) -> FastAPI:
     device = DeviceManager(backend)
     tutor = tutor or Tutor()
     webui = webui or WebUI(model=tutor.model)
@@ -78,20 +114,32 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         setup = asyncio.create_task(webui.prepare())
         yield
         setup.cancel()
-        await device.disconnect()   # stop OpenMuse cleanly when the app exits
+        await device.disconnect()  # stop OpenMuse cleanly when the app exits
 
     app = FastAPI(title="NeuroChat companion", lifespan=lifespan)
     app.state.device = device
     gaze = GazeSession(device.eeg_between, lambda: device.backend.srate)
     app.state.gaze = gaze
-    engagement = LiveEngagement(device.eeg_between, device.window, lambda: device.backend.srate, time.monotonic)
+    engagement = LiveEngagement(
+        device.eeg_between,
+        device.window,
+        lambda: device.backend.srate,
+        time.monotonic,
+    )
     app.state.engagement = engagement
 
     def meaningful_eeg() -> bool:
-        """Real headset EEG, or synthetic EEG with a known engagement level. The plain simulated
-        headset's EEG is noise, so its engagement never reaches the model."""
+        """Real headset EEG, or synthetic EEG with a known engagement level.
+
+        The plain simulated
+        headset's EEG is noise, so its engagement never reaches the model.
+        """
         b = device.backend
-        return device.state == "streaming" and (not getattr(b, "simulated", False) or getattr(b, "synthetic_eeg", False))
+        return device.state == "streaming" and (
+            not getattr(b, "simulated", False)
+            or getattr(b, "synthetic_eeg", False)
+        )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=ALLOWED_ORIGINS.pattern,
@@ -109,7 +157,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         try:
             await device.scan(timeout=min(max(timeout, 1.0), 15.0))
         except BackendError as e:
-            raise HTTPException(status_code=409, detail=str(e))
+            raise HTTPException(status_code=409, detail=str(e)) from e
         return device.status()
 
     @app.post("/api/device/connect")
@@ -117,7 +165,7 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         try:
             await device.connect(req.address)
         except BackendError as e:
-            raise HTTPException(status_code=409, detail=str(e))
+            raise HTTPException(status_code=409, detail=str(e)) from e
         return device.status()
 
     @app.post("/api/device/disconnect")
@@ -139,9 +187,13 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @app.websocket("/ws/headset")
     async def browser_headset(ws: WebSocket):
-        """A headset the portal connected with Web Bluetooth. The page sends {"type": "hello", "name": ...},
-        then {"type": "data", "packets": [[uuid, hex], ...]} batches of raw notifications, and
-        {"type": "lost", "message": ...} if Bluetooth drops. Closing the socket disconnects."""
+        """A headset the portal connected with Web Bluetooth.
+
+        The page sends {"type": "hello", "name": ...}, then {"type": "data",
+        "packets": [[uuid, hex], ...]} batches of raw notifications, and
+        {"type": "lost", "message": ...} if Bluetooth drops. Closing the socket
+        disconnects.
+        """
         await ws.accept()
         headset, error = None, None
         try:
@@ -151,13 +203,17 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                 if kind == "hello" and headset is None:
                     headset = BrowserHeadset()
                     try:
-                        await device.connect_browser(headset, str(msg.get("name") or "Muse")[:40])
+                        await device.connect_browser(
+                            headset, str(msg.get("name") or "Muse")[:40]
+                        )
                     except BackendError as e:
                         headset = None
                         await ws.send_json({"type": "error", "message": str(e)})
                         break
                 elif kind == "data" and headset is not None:
-                    if headset.closed:  # disconnected from the portal's button or another tab
+                    if (
+                        headset.closed
+                    ):  # disconnected from the portal's button or another tab
                         break
                     headset.feed(msg.get("packets") or [])
                 elif kind == "lost":
@@ -183,12 +239,17 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @app.get("/chat")
     async def open_chat():
-        """Straight to the chat: NeuroChat's own chat page. Open WebUI stays one click away from it."""
+        """Straight to the chat: NeuroChat's own chat page.
+
+        Open WebUI stays one click away from it.
+        """
         return RedirectResponse("/chat.html")
 
     @app.get("/api/engagement")
     async def engagement_status():
-        """The NeuroChat engagement score right now (last 15 s), its bucket, and the calibration."""
+        """The NeuroChat engagement score right now (last 15 s), its bucket, and
+        the calibration.
+        """
         st = engagement.status()
         if not meaningful_eeg():
             st["now"] = None
@@ -196,28 +257,37 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @app.post("/api/engagement/calibration/{phase}/{step}")
     async def calibrate(phase: str, step: str):
-        """Calibration as in the paper: start, about 2 minutes of relaxing (phase relax) or of the
-        word-chain task (phase task), finish. Both done → scores are normalized to them."""
+        """Calibration as in the paper: start, about 2 minutes of relaxing
+        (phase relax) or of the word-chain task (phase task), finish. Both done
+        → scores are normalized to them.
+        """
         if phase not in ("relax", "task") or step not in ("start", "finish"):
-            raise HTTPException(status_code=404, detail="Use /relax/start, /relax/finish, /task/start or /task/finish.")
+            raise HTTPException(
+                status_code=404,
+                detail="Use /relax/start, /relax/finish, /task/start or /task/finish.",
+            )
         if not meaningful_eeg():
-            raise HTTPException(status_code=409, detail="Connect the headset first.")
+            raise HTTPException(
+                status_code=409, detail="Connect the headset first."
+            )
         try:
             if step == "start":
                 engagement.start(phase)
             else:
                 engagement.finish(phase)
         except CalibrationError as e:
-            raise HTTPException(status_code=409, detail=str(e))
+            raise HTTPException(status_code=409, detail=str(e)) from e
         return engagement.status()
 
     @app.put("/api/engagement/calibration")
     async def set_calibration(values: CalibrationValues):
-        """Use E_min and E_max from an earlier or offline calibration (python -m companion.engagement)."""
+        """Use E_min and E_max from an earlier or offline calibration (python -m
+        companion.engagement).
+        """
         try:
             engagement.set(values.e_min, values.e_max)
         except CalibrationError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(status_code=422, detail=str(e)) from e
         return engagement.status()
 
     @app.delete("/api/engagement/calibration")
@@ -226,58 +296,87 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
         return engagement.status()
 
     def signals_for(msg: dict | None, follow_up: bool = False) -> str:
-        """What the system prompt is told about the reader for this turn: the reading page's numbers
-        for the paragraph (msg, the explain request), the gaze log's visits, and EEG engagement.
-        Engagement is the paragraph's own when gaze tracked it, else the paper's live score over the
-        last 15 s; follow-ups always get the live score, as the paper scores every message."""
+        """What the system prompt is told about the reader for this turn: the
+        reading page's numbers for the paragraph (msg, the explain request), the
+        gaze log's visits, and EEG engagement. Engagement is the paragraph's own
+        when gaze tracked it, else the paper's live score over the last 15 s;
+        follow-ups always get the live score, as the paper scores every message.
+        """
         msg = msg or {}
 
         def num(key):
             v = msg.get(key)
-            return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+            return (
+                float(v)
+                if isinstance(v, (int, float))
+                and not isinstance(v, bool)
+                and v > 0
+                else None
+            )
+
         index = msg.get("index")
         row = None
         if isinstance(index, int):
-            row = next((r for r in gaze.summary()["paragraphs"] if r["paragraph"] == index), None)
+            row = next(
+                (
+                    r
+                    for r in gaze.summary()["paragraphs"]
+                    if r["paragraph"] == index
+                ),
+                None,
+            )
         reading = None
         if meaningful_eeg():
             if row and row["engagement"] is not None and not follow_up:
-                reading = engagement.of(row["engagement"], "while they read this paragraph")
+                reading = engagement.of(
+                    row["engagement"], "while they read this paragraph"
+                )
             else:
                 reading = engagement.now()
         return reader_notes(
-            num("dwellMsPer100Words"), num("medianMsPer100Words"),
-            int(msg["rereads"]) if isinstance(msg.get("rereads"), int) else None,
+            num("dwellMsPer100Words"),
+            num("medianMsPer100Words"),
+            int(msg["rereads"])
+            if isinstance(msg.get("rereads"), int)
+            else None,
             row["visits"] if row else None,
             reading,
         )
 
     @app.websocket("/ws/chat")
     async def chat(ws: WebSocket):
-        """One conversation with the tutor. The client sends
-        {"type": "explain", "paragraph": ..., "title": ..., "context": ...} to start on a paragraph
-        (or a selected passage, with the paragraph around it as optional context), optionally with what
-        the reading page measured: "index", "dwellMsPer100Words", "medianMsPer100Words", "rereads"; or
-        {"type": "ask", "text": ...} for a follow-up. Replies stream back as
-        {"type": "start"}, then {"type": "token", "text": ...}..., then {"type": "done"},
-        or {"type": "error", "message": ...}.
-        {"type": "continue"} copies the conversation into Open WebUI and answers
-        {"type": "continued", "url": ...} (or an error), so it can carry on there.
-        The side chat keeps one conversation per page and restores it with
-        {"type": "load", "messages": [{"role", "content"}...], "mode": "explain" | "chat"} (answered
-        {"type": "loaded"}), and sends {"type": "explain", ..., "append": true} to add a new passage to
-        the conversation instead of starting over."""
+        """One conversation with the tutor.
+
+        The client sends {"type": "explain", "paragraph": ..., "title": ...,
+        "context": ...} to start on a paragraph (or a selected passage, with the
+        paragraph around it as optional context), optionally with what the
+        reading page measured: "index", "dwellMsPer100Words",
+        "medianMsPer100Words", "rereads"; or {"type": "ask", "text": ...} for a
+        follow-up. Replies stream back as {"type": "start"}, then {"type":
+        "token", "text": ...}..., then {"type": "done"}, or {"type": "error",
+        "message": ...}. {"type": "continue"} copies the conversation into Open
+        WebUI and answers {"type": "continued", "url": ...} (or an error), so it
+        can carry on there. The side chat keeps one conversation per page and
+        restores it with {"type": "load", "messages": [{"role", "content"}...],
+        "mode": "explain" | "chat"} (answered {"type": "loaded"}), and sends
+        {"type": "explain", ..., "append": true} to add a new passage to the
+        conversation instead of starting over.
+        """
         await ws.accept()
         history: list[dict] = []
         title = "Chat with the tutor"
         base = SYSTEM_PROMPT
-        passage: dict | None = None   # the explain request the conversation is on, for its reading numbers
+        passage: dict | None = (
+            None  # the explain request the conversation is on, for its reading numbers
+        )
         try:
             while True:
                 msg = await ws.receive_json()
                 if msg.get("type") == "continue":
                     if not history:
-                        await ws.send_json({"type": "continued", "url": webui.new_chat_url()})
+                        await ws.send_json(
+                            {"type": "continued", "url": webui.new_chat_url()}
+                        )
                         continue
                     try:
                         url = await webui.import_chat(history, title)
@@ -287,10 +386,21 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                     await ws.send_json({"type": "continued", "url": url})
                     continue
                 if msg.get("type") == "load":
-                    history = [{"role": m["role"], "content": str(m["content"])[:12000]}
-                               for m in msg.get("messages") or []
-                               if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")][-40:]
-                    base = CHAT_PROMPT if msg.get("mode") == "chat" else SYSTEM_PROMPT
+                    history = [
+                        {
+                            "role": m["role"],
+                            "content": str(m["content"])[:12000],
+                        }
+                        for m in msg.get("messages") or []
+                        if isinstance(m, dict)
+                        and m.get("role") in ("user", "assistant")
+                        and m.get("content")
+                    ][-40:]
+                    base = (
+                        CHAT_PROMPT
+                        if msg.get("mode") == "chat"
+                        else SYSTEM_PROMPT
+                    )
                     passage = None
                     title = (msg.get("title") or title)[:80]
                     await ws.send_json({"type": "loaded"})
@@ -300,19 +410,38 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                         title = f"Explaining: {msg['paragraph'][:60].strip()}…"
                         base = SYSTEM_PROMPT
                         history = []
-                    passage = msg   # an appended passage brings its own numbers too
+                    passage = (
+                        msg  # an appended passage brings its own numbers too
+                    )
                     system = base + signals_for(passage)
-                    history.append({"role": "user", "content": explain_request(msg["paragraph"][:6000], msg.get("title"), (msg.get("context") or "")[:6000],
-                                                         msg.get("rereads") if isinstance(msg.get("rereads"), int) else None)})
+                    history.append(
+                        {
+                            "role": "user",
+                            "content": explain_request(
+                                msg["paragraph"][:6000],
+                                msg.get("title"),
+                                (msg.get("context") or "")[:6000],
+                                msg.get("rereads")
+                                if isinstance(msg.get("rereads"), int)
+                                else None,
+                            ),
+                        }
+                    )
                 elif msg.get("type") == "ask" and msg.get("text", "").strip():
-                    if not history:  # a chat that starts with a question, not a paragraph
+                    if (
+                        not history
+                    ):  # a chat that starts with a question, not a paragraph
                         title = msg["text"].strip()[:60]
                         base = CHAT_PROMPT
                         passage = None
                     system = base + signals_for(passage, follow_up=True)
-                    history.append({"role": "user", "content": msg["text"].strip()})
+                    history.append(
+                        {"role": "user", "content": msg["text"].strip()}
+                    )
                 else:
-                    await ws.send_json({"type": "error", "message": "Unknown message."})
+                    await ws.send_json(
+                        {"type": "error", "message": "Unknown message."}
+                    )
                     continue
                 await ws.send_json({"type": "start"})
                 reply = []
@@ -331,18 +460,26 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
 
     @app.websocket("/ws/gaze")
     async def gaze_events(ws: WebSocket):
-        """Where the reader's eyes are, from the reading page. The page sends {"type": "enter", "paragraph": i}
-        when the gaze settles on a paragraph, {"type": "leave"} when it leaves the text or the face is lost,
-        and {"type": "reset"} to start a new reading. Each closed visit comes back as
-        {"type": "visit", "paragraph", "seconds", "engagement"}, engagement being the EEG engagement index
-        over the visit (null without headset data). A new connection starts a new reading."""
+        """Where the reader's eyes are, from the reading page.
+
+        The page sends {"type": "enter", "paragraph": i} when the gaze settles
+        on a paragraph, {"type": "leave"} when it leaves the text or the face is
+        lost, and {"type": "reset"} to start a new reading. Each closed visit
+        comes back as {"type": "visit", "paragraph", "seconds", "engagement"},
+        engagement being the EEG engagement index over the visit (null without
+        headset data). A new connection starts a new reading.
+        """
         await ws.accept()
         gaze.reset()
         try:
             while True:
                 msg = await ws.receive_json()
                 kind = msg.get("type")
-                if kind == "enter" and isinstance(msg.get("paragraph"), int) and msg["paragraph"] >= 0:
+                if (
+                    kind == "enter"
+                    and isinstance(msg.get("paragraph"), int)
+                    and msg["paragraph"] >= 0
+                ):
                     visit = gaze.enter(msg["paragraph"])
                 elif kind == "leave":
                     visit = gaze.leave()
@@ -350,7 +487,9 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
                     gaze.reset()
                     visit = None
                 else:
-                    await ws.send_json({"type": "error", "message": "Unknown message."})
+                    await ws.send_json(
+                        {"type": "error", "message": "Unknown message."}
+                    )
                     continue
                 if visit is not None:
                     await ws.send_json(visit_json(visit))
@@ -361,8 +500,12 @@ def create_app(backend: Backend, tutor: Tutor | None = None, webui: WebUI | None
     async def gaze_summary():
         return gaze.summary()
 
-    app.include_router(record_router(device))   # Phase 2 recording page (reading-signals)
+    app.include_router(
+        record_router(device)
+    )  # Phase 2 recording page (reading-signals)
 
     if PORTAL_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
+        app.mount(
+            "/", StaticFiles(directory=PORTAL_DIR, html=True), name="portal"
+        )
     return app

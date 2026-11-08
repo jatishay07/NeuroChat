@@ -1,4 +1,7 @@
-"""The end-to-end engagement check (companion/e2e.py): real server, sockets and timing, about a minute."""
+"""The end-to-end engagement check (companion/e2e.py): real server, sockets and
+timing, about a minute.
+"""
+
 from companion.e2e import run
 
 
