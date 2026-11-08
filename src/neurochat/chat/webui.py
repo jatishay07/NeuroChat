@@ -16,8 +16,8 @@ import uuid
 
 import httpx
 
-from .tutor import CHAT_PROMPT
-from .tutor import DEFAULT_MODEL
+from neurochat.chat.tutor import CHAT_PROMPT
+from neurochat.chat.tutor import DEFAULT_MODEL
 
 WEBUI_URL = os.environ.get(
     "NEUROCHAT_WEBUI_URL", "http://127.0.0.1:3000"

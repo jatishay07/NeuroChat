@@ -13,3 +13,10 @@ Newest last. Mark handled messages `[done]`.
   PR #42 overlaps 7 reformatted files (companion/app.py, tutor.py, extension/background.js,
   sidepanel.js, study/study-content.js, tests/study/extension.mjs, tests/test_study.py). Whichever
   merges second: take your side in those files, then run scripts/format.sh. Happy to do it for you.
+- RESULT 2026-11-08 from style: code layout PR (draft, merges after #42) moves files you own.
+  Python: companion/ → src/neurochat/ (`python -m neurochat`): app.py, __main__.py, device/ (same files);
+  signals/ = engagement, eyemove, gaze, recording, synthetic; chat/ = tutor, webui;
+  research/ = e2e, eyedata, realdata, session_record. Imports are absolute (`from neurochat.signals.engagement import …`).
+  Portal: page URLs unchanged; scripts/styles move next to their page: study/, eyes/, record/, chat/,
+  connect/ (index.html: app.js, bluetooth.js), shared/ (style.css, reader.css, reader-ui.js, tutor.js, tutor.css).
+  After it merges: merge main; git follows the renames, so your edits normally land in the moved files.

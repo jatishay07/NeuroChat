@@ -8,20 +8,20 @@ import json
 import numpy as np
 import pytest
 
-from companion import eyemove
-from companion.eyedata import find_tracking_files
-from companion.eyedata import load_tracking_csv
-from companion.eyedata import mm_to_deg
-from companion.eyedata import Saccade
-from companion.eyedata import score_saccades
-from companion.eyedata import stimulus_jumps
-from companion.eyedata import synthetic_eyes
-from companion.eyemove import AF7
-from companion.eyemove import AF8
-from companion.eyemove import detect
-from companion.eyemove import detect_saccades
-from companion.eyemove import fit_gain
-from companion.recording import save_csv
+from neurochat.research.eyedata import find_tracking_files
+from neurochat.research.eyedata import load_tracking_csv
+from neurochat.research.eyedata import mm_to_deg
+from neurochat.research.eyedata import Saccade
+from neurochat.research.eyedata import score_saccades
+from neurochat.research.eyedata import stimulus_jumps
+from neurochat.research.eyedata import synthetic_eyes
+from neurochat.signals import eyemove
+from neurochat.signals.eyemove import AF7
+from neurochat.signals.eyemove import AF8
+from neurochat.signals.eyemove import detect
+from neurochat.signals.eyemove import detect_saccades
+from neurochat.signals.eyemove import fit_gain
+from neurochat.signals.recording import save_csv
 
 BLINKS = [10.3, 33.1, 57.7, 80.2]
 CLENCHES = [(20.0, 21.0), (70.0, 70.6)]
@@ -205,7 +205,7 @@ def test_command_line_summary(tmp_path, capsys):
 
 
 def test_phase1_report_over_a_folder(tmp_path, capsys):
-    from companion import eyedata
+    from neurochat.research import eyedata
 
     for i in range(2):
         _write_tracking_csv(

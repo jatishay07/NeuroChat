@@ -232,4 +232,4 @@ elseif ($WebUIMode -ne "off") {
 $Url = "http://127.0.0.1:8765"
 Start-Job { Start-Sleep 2; Start-Process $using:Url } | Out-Null
 Write-Host "Opening $Url (Ctrl+C to stop)"
-try { & $VenvPy -m companion @Rest } finally { Stop-WebUI }
+try { & $VenvPy -m neurochat @Rest } finally { Stop-WebUI }

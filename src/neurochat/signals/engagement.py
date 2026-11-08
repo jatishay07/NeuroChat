@@ -16,7 +16,7 @@ on top: the normalized score is cut into three bands, each with concrete
 instructions for the tutor, so a small local model (Qwen 3.5 4B) gets something
 it can act on rather than a bare number.
 
-Run `python -m companion.engagement --help` to make synthetic recordings or
+Run `python -m neurochat.signals.engagement --help` to make synthetic recordings or
 score a real one.
 """
 
@@ -497,8 +497,8 @@ def score_recording(
 
 
 def _cmd_synth(args) -> None:
-    from .recording import save_csv
-    from .synthetic import synthetic_session
+    from neurochat.signals.recording import save_csv
+    from neurochat.signals.synthetic import synthetic_session
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -512,7 +512,7 @@ def _cmd_synth(args) -> None:
 
 
 def _cmd_score(args) -> None:
-    from .recording import load_recording
+    from neurochat.signals.recording import load_recording
 
     rec = load_recording(args.reading, srate=args.srate)
     calibration = None
@@ -558,7 +558,7 @@ def _cmd_score(args) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
-        prog="python -m companion.engagement",
+        prog="python -m neurochat.signals.engagement",
         description=__doc__.split("\n")[0],
     )
     sub = p.add_subparsers(dest="cmd", required=True)

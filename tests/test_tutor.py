@@ -3,9 +3,9 @@ import json
 from fastapi.testclient import TestClient
 import httpx
 
-from companion.app import create_app
-from companion.device import SimulatedBackend
-from companion.tutor import Tutor
+from neurochat.app import create_app
+from neurochat.chat.tutor import Tutor
+from neurochat.device import SimulatedBackend
 
 
 def fake_ollama(
@@ -179,9 +179,9 @@ def test_explain_a_selection_with_its_paragraph():
 
 
 def test_reader_notes_turn_signals_into_advice():
-    from companion.engagement import Calibration
-    from companion.engagement import reading
-    from companion.tutor import reader_notes
+    from neurochat.chat.tutor import reader_notes
+    from neurochat.signals.engagement import Calibration
+    from neurochat.signals.engagement import reading
 
     cal = Calibration(0.3, 1.2)
     assert reader_notes() == ""
@@ -254,7 +254,7 @@ def real_headset_app(ollama, eeg=None):
 
 
 def test_real_headset_engagement_reaches_the_prompt():
-    from companion.gaze import Visit
+    from neurochat.signals.gaze import Visit
 
     ollama = fake_ollama()
     app = real_headset_app(ollama)
@@ -291,7 +291,7 @@ def test_real_headset_engagement_reaches_the_prompt():
 
 
 def test_follow_ups_and_unindexed_passages_get_the_live_score():
-    from companion.synthetic import synthetic_eeg
+    from neurochat.signals.synthetic import synthetic_eeg
 
     ollama = fake_ollama()
     app = real_headset_app(ollama, synthetic_eeg(0.05, 20, seed=4))
@@ -320,7 +320,7 @@ def test_follow_ups_and_unindexed_passages_get_the_live_score():
 def test_engagement_without_calibration_is_relative_to_the_reading():
     import numpy as np
 
-    from companion.synthetic import synthetic_eeg
+    from neurochat.signals.synthetic import synthetic_eeg
 
     ollama = fake_ollama()
     levels = [0.9] * 60 + [0.1] * 20
@@ -342,7 +342,7 @@ def test_engagement_without_calibration_is_relative_to_the_reading():
 def test_calibration_api():
     import time as _time
 
-    from companion.synthetic import synthetic_eeg
+    from neurochat.signals.synthetic import synthetic_eeg
 
     ollama = fake_ollama()
     with TestClient(
@@ -399,7 +399,7 @@ def test_calibration_api():
 
 
 def test_explain_mentions_rereads():
-    from companion.tutor import explain_request
+    from neurochat.chat.tutor import explain_request
 
     assert "reread it 3 times" in explain_request("x", "T", rereads=3)
     assert "reread" not in explain_request("x", "T", rereads=0)

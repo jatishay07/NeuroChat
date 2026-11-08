@@ -40,7 +40,7 @@ newline) from `.editorconfig`.
 ## What's left alone
 
 - Third-party code stays exactly as upstream ships it: `portal/vendor/`,
-  `portal/web/` and `companion/device/athena_decode.py` (from OpenMuse).
+  `portal/web/` and `src/neurochat/device/athena_decode.py` (from OpenMuse).
 - `.graph/` and `CLAUDE.md`, the maintainer's shared AI working notes, aren't
   reformatted, because many sessions append to them at once.
 - Test fixtures under `tests/fixtures/` and `tests/study/fixtures/`.

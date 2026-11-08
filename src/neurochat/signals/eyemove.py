@@ -15,7 +15,7 @@ burst of fast muscle activity (30–100 Hz) behind the ears, on TP9 and TP10.
 - Clench: 30–100 Hz power on TP9/TP10 well above its own median for at least 150 ms.
 
 Everything works on channels × samples in µV, in the headset's order TP9, AF7,
-AF8, TP10. Run `python -m companion.eyemove <recording>` to list what a file
+AF8, TP10. Run `python -m neurochat.signals.eyemove <recording>` to list what a file
 contains.
 """
 
@@ -34,7 +34,7 @@ from scipy.signal import iirnotch
 from scipy.signal import sosfiltfilt
 from scipy.signal import tf2sos
 
-from .device.backends import EEG_CHANNELS
+from neurochat.device.backends import EEG_CHANNELS
 
 TP9, AF7, AF8, TP10 = (
     EEG_CHANNELS.index(c) for c in ("TP9", "AF7", "AF8", "TP10")
@@ -333,10 +333,11 @@ def fit_gain(steps_uv: np.ndarray, degrees: np.ndarray) -> float:
 
 
 def main(argv: list[str] | None = None) -> None:
-    from .recording import load_recording
+    from neurochat.signals.recording import load_recording
 
     p = argparse.ArgumentParser(
-        prog="python -m companion.eyemove", description=__doc__.split("\n")[0]
+        prog="python -m neurochat.signals.eyemove",
+        description=__doc__.split("\n")[0],
     )
     p.add_argument("recording", help="Muse recording (CSV, NPZ or XDF)")
     p.add_argument(

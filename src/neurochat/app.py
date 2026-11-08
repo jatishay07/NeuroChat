@@ -24,25 +24,25 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.websockets import WebSocketClose
 
-from .device import Backend
-from .device import BackendError
-from .device import BrowserHeadset
-from .device import DeviceManager
-from .engagement import CalibrationError
-from .engagement import LiveEngagement
-from .gaze import GazeSession
-from .gaze import visit_json
-from .session_record import record_router
-from .tutor import CHAT_PROMPT
-from .tutor import explain_request
-from .tutor import reader_notes
-from .tutor import SYSTEM_PROMPT
-from .tutor import Tutor
-from .tutor import TutorError
-from .webui import WebUI
-from .webui import WebUIError
+from neurochat.chat.tutor import CHAT_PROMPT
+from neurochat.chat.tutor import explain_request
+from neurochat.chat.tutor import reader_notes
+from neurochat.chat.tutor import SYSTEM_PROMPT
+from neurochat.chat.tutor import Tutor
+from neurochat.chat.tutor import TutorError
+from neurochat.chat.webui import WebUI
+from neurochat.chat.webui import WebUIError
+from neurochat.device import Backend
+from neurochat.device import BackendError
+from neurochat.device import BrowserHeadset
+from neurochat.device import DeviceManager
+from neurochat.research.session_record import record_router
+from neurochat.signals.engagement import CalibrationError
+from neurochat.signals.engagement import LiveEngagement
+from neurochat.signals.gaze import GazeSession
+from neurochat.signals.gaze import visit_json
 
-PORTAL_DIR = Path(__file__).resolve().parent.parent / "portal"
+PORTAL_DIR = Path(__file__).resolve().parents[2] / "portal"
 
 # Who may talk to the companion. CORS alone isn't enough: browsers don't apply
 # it to WebSockets or to simple POSTs, so any website you visit could otherwise
@@ -282,7 +282,7 @@ def create_app(
     @app.put("/api/engagement/calibration")
     async def set_calibration(values: CalibrationValues):
         """Use E_min and E_max from an earlier or offline calibration (python -m
-        companion.engagement).
+        neurochat.signals.engagement).
         """
         try:
             engagement.set(values.e_min, values.e_max)

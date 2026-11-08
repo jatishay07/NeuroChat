@@ -1,7 +1,7 @@
-"""The kernel on real Muse recordings (companion/realdata.py).
+"""The kernel on real Muse recordings (src/neurochat/research/realdata.py).
 
 Needs the files, so it runs only when NEUROCHAT_BIRD_DATA points at a folder
-made by `python -m companion.realdata --out <folder>`.
+made by `python -m neurochat.research.realdata --out <folder>`.
 """
 
 import os
@@ -10,8 +10,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from companion.realdata import report
-from companion.realdata import SUBJECTS
+from neurochat.research.realdata import report
+from neurochat.research.realdata import SUBJECTS
 
 FOLDER = os.environ.get("NEUROCHAT_BIRD_DATA")
 pytestmark = pytest.mark.skipif(

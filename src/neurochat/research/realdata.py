@@ -1,6 +1,6 @@
 """Run the engagement kernel on real, public Muse recordings.
 
-    python -m companion.realdata --out data/bird    # downloads about 18 MB, then prints the report
+    python -m neurochat.research.realdata --out data/bird    # downloads about 18 MB, then prints the report
 
 The recordings are the "mental state" set from Bird et al., "A Study on Mental
 State Classification using EEG-based Brain-Machine Interface" (IEEE IS 2018),
@@ -23,12 +23,12 @@ import urllib.request
 
 import numpy as np
 
-from .engagement import Calibration
-from .engagement import calibration_bound
-from .engagement import CalibrationError
-from .engagement import engagement_index
-from .engagement import score_recording
-from .recording import load_recording
+from neurochat.signals.engagement import Calibration
+from neurochat.signals.engagement import calibration_bound
+from neurochat.signals.engagement import CalibrationError
+from neurochat.signals.engagement import engagement_index
+from neurochat.signals.engagement import score_recording
+from neurochat.signals.recording import load_recording
 
 SOURCE = "https://raw.githubusercontent.com/jordan-bird/eeg-feature-generation/master/dataset/original_data"
 SUBJECTS = "abcd"
@@ -107,7 +107,8 @@ def report(folder: Path, baseline: str = "neutral") -> dict:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
-        prog="python -m companion.realdata", description=__doc__.split("\n")[0]
+        prog="python -m neurochat.research.realdata",
+        description=__doc__.split("\n")[0],
     )
     p.add_argument("--out", default="data/bird")
     p.add_argument(

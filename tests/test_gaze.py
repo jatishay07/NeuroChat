@@ -3,10 +3,10 @@ import time
 from fastapi.testclient import TestClient
 import numpy as np
 
-from companion.app import create_app
-from companion.device import SimulatedBackend
-from companion.engagement import engagement_index
-from companion.gaze import GazeSession
+from neurochat.app import create_app
+from neurochat.device import SimulatedBackend
+from neurochat.signals.engagement import engagement_index
+from neurochat.signals.gaze import GazeSession
 
 SRATE = 256.0
 

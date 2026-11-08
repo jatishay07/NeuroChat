@@ -4,7 +4,7 @@ How the headset's EEG becomes a 0–1 engagement score, and how that score chang
 what the tutor is told. This needs a Muse S Athena (or the simulator); study mode
 doesn't use it.
 
-`companion/engagement.py` is the NeuroChat kernel, computed the way the paper does (§3.2): 1–30 Hz
+`src/neurochat/signals/engagement.py` is the NeuroChat kernel, computed the way the paper does (§3.2): 1–30 Hz
 band-pass and 60 Hz notch, 1 s epochs every 250 ms, engagement = β / (α + θ) with θ 4–7, α 7–11 and
 β 11–20 Hz, band powers averaged over a 15 s window that moves every second. Epochs with blinks or a
 sensor off the skin are dropped. A calibration (2 min relaxing, 2 min word chain) gives E_min and
@@ -25,15 +25,15 @@ The model is told never to mention or hint at the EEG, and the end-to-end check 
 reaches the prompt.
 
 ```bash
-python -m companion.engagement synth --out synthetic-eeg        # relax.csv, task.csv, reading.csv, labels.json
-python -m companion.engagement score synthetic-eeg/reading.csv \
+python -m neurochat.signals.engagement synth --out synthetic-eeg        # relax.csv, task.csv, reading.csv, labels.json
+python -m neurochat.signals.engagement score synthetic-eeg/reading.csv \
     --relax synthetic-eeg/relax.csv --task synthetic-eeg/task.csv  # per-second score and band
-python -m companion --simulate --engagement demo                 # live: low, moderate, high every 60 s
-python -m companion.e2e                                          # end-to-end check, about a minute
-python -m companion.e2e --ollama http://127.0.0.1:11434          # same, with the real model answering
+python -m neurochat --simulate --engagement demo                 # live: low, moderate, high every 60 s
+python -m neurochat.research.e2e                                          # end-to-end check, about a minute
+python -m neurochat.research.e2e --ollama http://127.0.0.1:11434          # same, with the real model answering
 ```
 
-`python -m companion.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four
+`python -m neurochat.research.realdata --out data/bird` downloads public Muse recordings (Bird et al. 2018: four
 people, relaxed / neutral / concentrating) and scores them. Concentrating reads above neutral for three
 of the four, and above it on held-out sessions; set `NEUROCHAT_BIRD_DATA=data/bird` to include that
 check in `pytest`.

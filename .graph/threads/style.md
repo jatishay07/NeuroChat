@@ -6,7 +6,7 @@ Owned by the `style` thread; only it edits this file.
 
 - **project thread:** Organize repo to Google standards
 - **node:** Reviewer → waiting on Integrator
-- **task:** S-1 Google style guides for every language + contributor-ready docs (side task)
+- **task:** S-1 Google style guides + contributor docs (merged #46); S-2 code layout: src/neurochat + portal by page (Atishay said yes, 2026-11-08)
 - **status:** active
 - **owns:** .editorconfig, .prettierrc.json, .prettierignore, .git-blame-ignore-revs,
   [tool.ruff] + dev extras in pyproject.toml, scripts/format.sh, scripts/lint.sh,
@@ -19,8 +19,7 @@ Owned by the `style` thread; only it edits this file.
 
 ## State
 
-- Node: Reviewer → PR open, waiting on Integrator.
-- Last: `[Tester] S-1 → pytest 81 passed 1 skipped (= main), lint + public-safety pass → Reviewer`
+- Node: Reviewer → draft PR for S-2, held until #42 merges (Atishay's pick).
+- Last: `[Tester] S-2 → pytest 81 passed 1 skipped, lint, public safety, browser smoke of every page, clean-clone start.sh → Reviewer`
 - Retry counters: Tester 0/3, Reviewer 0/2.
-- Open question (Atishay): move code folders (companion/ → src/neurochat/, portal/ by feature)
-  in a second PR after #42 lands, or keep the layout? Asked on a decision card.
+- S-1: PR #46 merged 2026-11-08; brain write-back PR jatishay07/brain#5.

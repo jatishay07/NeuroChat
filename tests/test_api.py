@@ -3,8 +3,8 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from companion.app import create_app
-from companion.device import SimulatedBackend
+from neurochat.app import create_app
+from neurochat.device import SimulatedBackend
 
 
 def test_connect_flow_over_http_and_websocket():

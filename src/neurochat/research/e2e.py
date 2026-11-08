@@ -1,8 +1,8 @@
 """End-to-end check of engagement → prompt, through the real servers and
 sockets.
 
-    python -m companion.e2e                      # with a stand-in for Ollama (about a minute)
-    python -m companion.e2e --ollama http://127.0.0.1:11434   # with the real model
+    python -m neurochat.research.e2e                      # with a stand-in for Ollama (about a minute)
+    python -m neurochat.research.e2e --ollama http://127.0.0.1:11434   # with the real model
 
 It starts the companion on a spare port with a simulated headset streaming
 synthetic EEG whose engagement follows a script, then does what a reader would:
@@ -29,10 +29,10 @@ import numpy as np
 import uvicorn
 from websockets.sync.client import connect as ws_connect
 
-from .app import create_app
-from .device import SimulatedBackend
-from .engagement import bucket_for
-from .tutor import Tutor
+from neurochat.app import create_app
+from neurochat.chat.tutor import Tutor
+from neurochat.device import SimulatedBackend
+from neurochat.signals.engagement import bucket_for
 
 # Seconds since the headset connected → the engagement level the synthetic EEG
 # carries.
@@ -320,7 +320,7 @@ def run(
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
-        prog="python -m companion.e2e",
+        prog="python -m neurochat.research.e2e",
         description="End-to-end engagement → prompt check.",
     )
     p.add_argument(

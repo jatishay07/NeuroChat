@@ -1,8 +1,8 @@
-"""The end-to-end engagement check (companion/e2e.py): real server, sockets and
+"""The end-to-end engagement check (src/neurochat/research/e2e.py): real server, sockets and
 timing, about a minute.
 """
 
-from companion.e2e import run
+from neurochat.research.e2e import run
 
 
 def test_engagement_reaches_the_model_end_to_end():

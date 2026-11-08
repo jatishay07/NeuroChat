@@ -9,15 +9,15 @@ from fastapi.testclient import TestClient
 import numpy as np
 import pytest
 
-from companion.app import create_app
-from companion.device import DeviceManager
-from companion.device import manager as manager_mod
-from companion.device import SimulatedBackend
-from companion.eyedata import synthetic_eyes
-from companion.session_record import dot_jumps
-from companion.session_record import load_session
-from companion.session_record import RecordError
-from companion.session_record import SessionRecorder
+from neurochat.app import create_app
+from neurochat.device import DeviceManager
+from neurochat.device import manager as manager_mod
+from neurochat.device import SimulatedBackend
+from neurochat.research.eyedata import synthetic_eyes
+from neurochat.research.session_record import dot_jumps
+from neurochat.research.session_record import load_session
+from neurochat.research.session_record import RecordError
+from neurochat.research.session_record import SessionRecorder
 
 SRATE = 256.0
 
@@ -196,4 +196,4 @@ def test_record_page_is_served():
     with TestClient(create_app(SimulatedBackend())) as client:
         page = client.get("/record.html")
         assert page.status_code == 200 and "record.js" in page.text
-        assert client.get("/record.js").status_code == 200
+        assert client.get("/record/record.js").status_code == 200

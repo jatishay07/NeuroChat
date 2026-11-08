@@ -311,4 +311,4 @@ command -v xdg-open >/dev/null && opener=xdg-open
   "$opener" "$url"
 ) >/dev/null 2>&1 &
 echo "Opening $url (Ctrl+C to stop)"
-python -m companion ${args[@]+"${args[@]}"} || true
+python -m neurochat ${args[@]+"${args[@]}"} || true

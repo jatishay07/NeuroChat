@@ -3,9 +3,9 @@ import time
 
 from fastapi.testclient import TestClient
 
-from companion.app import create_app
-from companion.device import BrowserHeadset
-from companion.device import SimulatedBackend
+from neurochat.app import create_app
+from neurochat.device import BrowserHeadset
+from neurochat.device import SimulatedBackend
 
 # A few seconds of raw Bluetooth notifications from a Muse S Athena (preset
 # p1041), from OpenMuse's public test data (tests/test_data/data_p1041.txt).

@@ -1,4 +1,4 @@
-"""Run the companion app: python -m companion [--simulate [--engagement
+"""Run the companion app: python -m neurochat [--simulate [--engagement
 LEVEL|demo]] [--port 8765] [--host 127.0.0.1].
 """
 
@@ -10,9 +10,9 @@ import os
 
 import uvicorn
 
-from .app import create_app
-from .device import MuseBackend
-from .device import SimulatedBackend
+from neurochat.app import create_app
+from neurochat.device import MuseBackend
+from neurochat.device import SimulatedBackend
 
 
 def demo_levels(t):
