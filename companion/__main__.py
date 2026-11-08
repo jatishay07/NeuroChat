@@ -1,5 +1,5 @@
 """Run the companion app: python -m companion [--simulate [--engagement
-LEVEL|demo]] [--port 8765] [--host 127.0.0.1].
+LEVEL|demo] | --replay bird|FILE] [--port 8765] [--host 127.0.0.1].
 """
 
 from __future__ import annotations
@@ -42,6 +42,12 @@ def main() -> None:
         help="with --simulate, stream synthetic EEG at this engagement level (0-1), or 'demo' to "
         "cycle low, moderate and high every 60 s, so the tutor's prompt reacts to it",
     )
+    parser.add_argument(
+        "--replay",
+        metavar="bird|FILE[,FILE...]",
+        help="play recorded EEG as if a headset were streaming it: 'bird' for public Muse "
+        "recordings (downloaded the first time), or your own CSV/NPZ/XDF files",
+    )
     parser.add_argument("--port", type=int, default=8765)
     # Only this computer can reach the portal by default. Docker sets 0.0.0.0 so
     # the published port works.
@@ -54,11 +60,16 @@ def main() -> None:
         level = demo_levels
     elif args.engagement is not None:
         level = min(max(float(args.engagement), 0.0), 1.0)
-    backend = (
-        SimulatedBackend(bad_channel=args.bad_channel, engagement=level)
-        if args.simulate
-        else MuseBackend()
-    )
+    if args.replay:
+        from .recording import replay_backend
+
+        backend = replay_backend(args.replay)
+    elif args.simulate:
+        backend = SimulatedBackend(
+            bad_channel=args.bad_channel, engagement=level
+        )
+    else:
+        backend = MuseBackend()
     print(f"Portal: http://127.0.0.1:{args.port}")
     print(
         f"Study mode (no headset needed): http://127.0.0.1:{args.port}/study.html"

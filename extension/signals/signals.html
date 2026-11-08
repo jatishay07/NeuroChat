@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroChat signals</title>
+    <link rel="stylesheet" href="signals.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand"
+        ><span class="spark" aria-hidden="true"></span>NeuroChat signals</span
+      >
+      <span class="source" id="source"
+        ><span class="dot" id="dot"></span
+        ><span id="sourceText">Connecting…</span></span
+      >
+    </header>
+
+    <main>
+      <p class="note" id="note" hidden></p>
+
+      <section class="card">
+        <div class="head">
+          <h2>Brain waves</h2>
+          <span class="sub">last 4 s, average of the 4 sensors</span>
+        </div>
+        <div class="wave">
+          <span class="label alpha">Alpha <em id="alphaHz"></em></span>
+          <canvas id="alphaWave" height="70"></canvas>
+        </div>
+        <div class="wave">
+          <span class="label beta">Beta <em id="betaHz"></em></span>
+          <canvas id="betaWave" height="70"></canvas>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="head">
+          <h2>Band power</h2>
+          <span class="sub">share of θ + α + β, last minute</span>
+        </div>
+        <canvas id="bands" height="120"></canvas>
+        <div class="legend">
+          <span class="theta">Theta</span><span class="alpha">Alpha</span
+          ><span class="beta">Beta</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="head">
+          <h2>Engagement</h2>
+          <span class="sub" id="engSub">β / (α + θ) over 15 s</span>
+        </div>
+        <div class="score">
+          <span class="big" id="score">–</span>
+          <span class="bucket" id="bucket"></span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <span class="zone low"></span><span class="zone moderate"></span
+          ><span class="zone high"></span
+          ><span class="mark" id="mark" hidden></span>
+        </div>
+        <div class="meterLabels">
+          <span>low</span><span>moderate</span><span>high</span>
+        </div>
+        <canvas id="scoreLine" height="70"></canvas>
+      </section>
+
+      <section class="card">
+        <div class="head">
+          <h2>What the tutor is told</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" id="tabLast" aria-selected="true">
+              Last sent
+            </button>
+            <button type="button" role="tab" id="tabNow" aria-selected="false">
+              If you asked now
+            </button>
+          </div>
+        </div>
+        <p class="sub" id="promptMeta"></p>
+        <pre class="prompt" id="prompt"></pre>
+      </section>
+    </main>
+    <script src="signals.js"></script>
+  </body>
+</html>

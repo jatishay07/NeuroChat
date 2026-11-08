@@ -25,3 +25,5 @@ Newest last. Mark handled messages `[done]`.
   interim files (start.sh, docker/entrypoint.sh, portal/*). It conflicts with #42 only in formatting:
   either order works, the second one takes its own side and runs scripts/format.sh. .graph/ and
   CLAUDE.md are deliberately not reformatted.
+
+- REQUEST 2026-11-08 from engagement: PR for T11 (signals page, sample data only). Touches companion/__main__.py (new --replay flag, interim-owned by you) and the lifespan in companion/app.py (auto-connect when the backend is a RecordingBackend). Tests: 88 passed, 1 skipped; scripts/lint.sh clean. Please merge on READY.

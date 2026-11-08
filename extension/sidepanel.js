@@ -410,3 +410,7 @@ $('newBtn').onclick = async () => {
   }, 10_000);
   takePending();
 })();
+
+// The signals page: the waves the headset recorded and the prompt the tutor got.
+$('signalsBtn').onclick = () =>
+  chrome.tabs.create({url: chrome.runtime.getURL('signals/signals.html')});

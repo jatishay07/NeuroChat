@@ -15,9 +15,12 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import time
 
 import numpy as np
 
+from .device.backends import BackendError
+from .device.backends import DeviceInfo
 from .device.backends import EEG_CHANNELS
 from .device.backends import EEG_SRATE
 
@@ -157,3 +160,104 @@ def save_csv(
         w.writerow(["timestamps", *channels])
         for i in range(eeg.shape[1]):
             w.writerow([f"{t[i]:.6f}", *(f"{v:.3f}" for v in eeg[:, i])])
+
+
+class RecordingBackend:
+    """Plays recordings back as if a headset were streaming them, in real time
+    and looping, so the app and the signals page run on real EEG without a
+    headset. parts is [(label, Recording)], played one after another; the label
+    of the part playing shows as the device name.
+    """
+
+    channels = EEG_CHANNELS
+    simulated = True
+    synthetic_eeg = True  # recorded from a person, so the tutor may use it
+    address = "REPLAY"
+
+    def __init__(self, parts: list[tuple[str, Recording]]):
+        if not parts:
+            raise ValueError("Nothing to play.")
+        rates = {round(r.srate) for _, r in parts}
+        if len(rates) != 1:
+            raise ValueError("All recordings must share one sample rate.")
+        self.srate = float(parts[0][1].srate)
+        self.data = np.concatenate(
+            [r.eeg[: len(self.channels)] for _, r in parts], axis=1
+        )
+        self.parts, edge = [], 0
+        for label, r in parts:
+            self.parts.append((edge, edge + r.eeg.shape[1], label))
+            edge += r.eeg.shape[1]
+        self.calibration: tuple[float, float] | None = (
+            None  # (E_min, E_max) to use, if known
+        )
+        self._t0: float | None = None
+        self._sent = 0
+
+    def playing(self) -> str | None:
+        """The label of the part being played now."""
+        if self._t0 is None:
+            return None
+        pos = self._sent % self.data.shape[1]
+        return next(
+            label for start, end, label in self.parts if start <= pos < end
+        )
+
+    async def scan(self, timeout: float) -> list[DeviceInfo]:
+        return [DeviceInfo(name="Recorded EEG (replay)", address=self.address)]
+
+    async def connect(self, address: str) -> None:
+        if address != self.address:
+            raise BackendError(f"No recording at {address}.")
+        self._t0 = time.monotonic()
+        self._sent = 0
+
+    async def disconnect(self) -> None:
+        self._t0 = None
+
+    def read(self) -> np.ndarray:
+        if self._t0 is None:
+            return np.empty((len(self.channels), 0))
+        due = int((time.monotonic() - self._t0) * self.srate)
+        n = due - self._sent
+        if n <= 0:
+            return np.empty((len(self.channels), 0))
+        idx = (self._sent + np.arange(n)) % self.data.shape[1]
+        self._sent = due
+        return self.data[:, idx]
+
+
+def replay_backend(spec: str) -> RecordingBackend:
+    """--replay: "bird" plays one person from the public Bird et al. Muse set
+    (relaxed, then neutral, then concentrating; downloaded into data/bird the
+    first time), anything else is a list of recording files separated by
+    commas.
+    """
+    if spec == "bird":
+        from .engagement import calibration_bound
+        from .realdata import fetch
+
+        folder = Path("data/bird")
+        fetch(folder)
+        # Calibrated the paper's way on the same person's other session, which isn't played.
+        neutral, focused = (
+            load_recording(folder / f"subjecta-{s}-2.csv")
+            for s in ("neutral", "concentrating")
+        )
+        backend = RecordingBackend(
+            [
+                (
+                    f"Bird et al. subject A, {state}",
+                    load_recording(folder / f"subjecta-{state}-1.csv"),
+                )
+                for state in ("relaxed", "neutral", "concentrating")
+            ]
+        )
+        backend.calibration = (
+            calibration_bound(neutral.eeg, neutral.srate, "relax"),
+            calibration_bound(focused.eeg, focused.srate, "task"),
+        )
+        return backend
+    return RecordingBackend(
+        [(Path(p).stem, load_recording(p)) for p in spec.split(",")]
+    )
